@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flask App</title>
+</head>
+<body>
+    <h1>Posts</h1>
+    
+    {% if current_user.is_authenticated %}
+        <form method="POST" action="{{ url_for('create_post') }}">
+            <textarea name="content" rows="4" cols="50" placeholder="Write your post..."></textarea>
+            <br/>
+            <input type="submit" value="Post">
+        </form>
+    {% endif %}
+    
+    {% for post in posts %}
+        <div style="border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
+            <strong>{{ post.author.username }}</strong>
+            <p>{{ post.content }}</p>
+        </div>
+    {% endfor %}
+    
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+        <a href="{{ url_for('login') }}">Login</a> |
+        <a href="{{ url_for('register') }}">Register</a>
+    {% endif %}
+</body>
+</html>
+
