@@ -1,32 +1,60 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Flask App</title>
+    <meta charset="UTF-8">
+    <title>Recipe Vault</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/call/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Posts</h1>
-    
-    {% if current_user.is_authenticated %}
-        <form method="POST" action="{{ url_for('create_post') }}">
-            <textarea name="content" rows="4" cols="50" placeholder="Write your post..."></textarea>
-            <br/>
-            <input type="submit" value="Post">
-        </form>
-    {% endif %}
-    
-    {% for post in posts %}
-        <div style="border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
-            <strong>{{ post.author.username }}</strong>
-            <p>{{ post.content }}</p>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
+            <div>
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">Add Recipe</a>
+                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">Add Ingredient</a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">Register</a>
+                {% endif %}
+            </div>
         </div>
-    {% endfor %}
-    
-    {% if current_user.is_authenticated %}
-        <a href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-        <a href="{{ url_for('login') }}">Login</a> |
-        <a href="{{ url_for('register') }}">Register</a>
-    {% endif %}
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h2 class="mb-4">Available Recipes</h2>
+        
+        {% if not recipes %}
+            <p class="text-muted">No recipes found. Start by creating one!</p>
+        {% endif %}
+
+        <div class="row">
+            {% for recipe in recipes %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ recipe.title }}</h5>
+                            <p class="card-text text-muted">{{ recipe.description[:100] }}...</p>
+                            <p class="small text-secondary">By {{ recipe.author.username }}</p>
+                        </div>
+                        <div class="card-footer bg-transparent border-top-0">
+                            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm w-100">View Recipe</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

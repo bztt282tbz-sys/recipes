@@ -1,4 +1,5 @@
 Flask
 Flask-Login
 Flask-SQLAlchemy
-Flask-Bcrypt  # Added for password hashing
+Flask-Bcrypt
+dotenv

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Recipe - Recipe Vault</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h3 class="mb-4">Create New Recipe</h3>
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Recipe Title</label>
+                                <input type="text" name="title" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="lagel-label">Instructions</label>
+                                <textarea name="instructions" class="form-control" rows="6" required placeholder="Step by step..."></textarea>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck">
+                                <label class="form-check-label" for="draftCheck">Keep as Draft (Hidden from public)</label>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary">Save Recipe</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
