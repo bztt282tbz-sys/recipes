@@ -1,14 +1,37 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, session
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///site.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600
+
+app.config['JSON_SORT_KEYS'] = False
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=os.environ.get('REDIS_URL') or "memory://"
+)
+
+csrf = CSRFProtect(app)
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+login_manager.session_protection = 'strong'
 bcrypt = Bcrypt(app)
 
 # --- Utilities ---
@@ -209,7 +232,32 @@ class RecipeStep(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return User.query.get(int(user_id))
+    except (ValueError, TypeError):
+        return None
+
+@app.before_request
+def csrf_protect():
+    if request.method == "POST":
+        token = session.get("_csrf_token")
+        if not token or token != request.form.get("_csrf_token"):
+            if request.is_json:
+                abort(400)
+            flash('Invalid CSRF token', 'danger')
+            # Skip CSRF check for forms without token (compatibility)
+            if not request.form.get("_csrf_token"):
+                return None
+            return redirect(request.full_path)
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 # --- Routes ---
 
@@ -243,11 +291,28 @@ def recipe_detail(recipe_id):
 @login_required
 def add_recipe():
     if request.method == 'POST':
-        title = request.form.get('title')
-        description = request.form.get('description')
-        instructions = request.form.get('instructions') or ''
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        instructions = request.form.get('instructions', '').strip()
         is_draft = True if request.form.get('is_draft') else False
-        portions = float(request.form.get('portions')) if request.form.get('portions') else 1
+        
+        if not title:
+            flash('Title is required', 'danger')
+            all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
+            all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
+            return render_template('add_recipe.html', all_ingredients=all_ingredients, all_units=all_units)
+        
+        portions = 1
+        if request.form.get('portions'):
+            try:
+                portions = float(request.form.get('portions'))
+                if portions <= 0:
+                    raise ValueError()
+            except ValueError:
+                flash('Portions must be a positive number', 'danger')
+                all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
+                all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
+                return render_template('add_recipe.html', all_ingredients=all_ingredients, all_units=all_units)
 
         new_recipe = Recipe(
             title=title,
@@ -321,11 +386,30 @@ def edit_recipe(recipe_id):
         return redirect(url_for('home'))
 
     if request.method == 'POST':
-        recipe.title = request.form.get('title')
-        recipe.description = request.form.get('description')
-        recipe.instructions = request.form.get('instructions') or ''
+        title = request.form.get('title', '').strip()
+        if not title:
+            flash('Title is required', 'danger')
+            all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
+            all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
+            return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units)
+        
+        recipe.title = title
+        recipe.description = request.form.get('description', '').strip()
+        recipe.instructions = request.form.get('instructions', '').strip()
         recipe.is_draft = True if request.form.get('is_draft') else False
-        recipe.portions = float(request.form.get('portions')) if request.form.get('portions') else 1
+        
+        portions = recipe.portions
+        if request.form.get('portions'):
+            try:
+                portions = float(request.form.get('portions'))
+                if portions <= 0:
+                    raise ValueError()
+            except ValueError:
+                flash('Portions must be a positive number', 'danger')
+                all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
+                all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
+                return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units)
+        recipe.portions = portions
 
         RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
         RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
@@ -411,7 +495,14 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if User.query.filter_by(username=username).first():
+        
+        if len(username) < 3 or len(username) > 20:
+            flash('Username must be 3-20 characters', 'danger')
+        elif not username.isalnum():
+            flash('Username must be alphanumeric', 'danger')
+        elif len(password) < 8:
+            flash('Password must be at least 8 characters', 'danger')
+        elif User.query.filter_by(username=username).first():
             flash('Username taken', 'danger')
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -432,7 +523,11 @@ def logout():
 @login_required
 def add_ingredient():
     if request.method == 'POST':
-        name = request.form.get('name')
+        name = request.form.get('name', '').strip()
+        if not name:
+            flash('Name is required', 'danger')
+            return render_template('add_ingredient.html')
+        
         density_type = request.form.get('density_type')
         density = None
         grams_per_unit = None
@@ -440,10 +535,26 @@ def add_ingredient():
         preferred_unit_id = None
         
         if density_type == 'g/ml':
-            density = float(request.form.get('density')) if request.form.get('density') else None
+            density_val = request.form.get('density')
+            if density_val:
+                try:
+                    density = float(density_val)
+                    if density <= 0:
+                        raise ValueError()
+                except ValueError:
+                    flash('Density must be a positive number', 'danger')
+                    return render_template('add_ingredient.html')
         elif density_type == 'g/unit':
-            grams_per_unit = float(request.form.get('grams_per_unit')) if request.form.get('grams_per_unit') else None
-            unit_name = request.form.get('unit_name') or None
+            grams_val = request.form.get('grams_per_unit')
+            if grams_val:
+                try:
+                    grams_per_unit = float(grams_val)
+                    if grams_per_unit <= 0:
+                        raise ValueError()
+                except ValueError:
+                    flash('Grams per unit must be a positive number', 'danger')
+                    return render_template('add_ingredient.html')
+            unit_name = request.form.get('unit_name', '').strip()
         
         comment = request.form.get('comment') or None
         
@@ -493,9 +604,26 @@ def add_ingredient():
 def add_unit():
     all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
     if request.method == 'POST':
-        name = request.form.get('name')
+        name = request.form.get('name', '').strip()
         unit_type = request.form.get('unit_type')
-        grams_conversion = float(request.form.get('grams_conversion'))
+        grams_conversion_val = request.form.get('grams_conversion')
+        
+        if not name:
+            flash('Name is required', 'danger')
+            return render_template('add_unit.html', all_ingredients=all_ingredients)
+        
+        if not unit_type or unit_type not in ('mass', 'volume', 'count'):
+            flash('Invalid unit type', 'danger')
+            return render_template('add_unit.html', all_ingredients=all_ingredients)
+        
+        try:
+            grams_conversion = float(grams_conversion_val)
+            if grams_conversion <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            flash('Grams conversion must be a positive number', 'danger')
+            return render_template('add_unit.html', all_ingredients=all_ingredients)
+        
         is_bound = True if request.form.get('is_bound') else False
         
         new_unit = Unit(
@@ -673,4 +801,4 @@ if __name__ == '__main__':
             
             db.session.commit()
         
-    app.run(debug=True, port=8001)
+    app.run(debug=os.environ.get('FLASK_ENV') != 'production', port=8001)

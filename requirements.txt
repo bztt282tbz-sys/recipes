@@ -2,4 +2,8 @@ Flask
 Flask-Login
 Flask-SQLAlchemy
 Flask-Bcrypt
-dotenv
+Flask-WTF
+Flask-Limiter
+gunicorn
+python-dotenv
+markupsafe

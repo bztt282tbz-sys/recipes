@@ -13,6 +13,7 @@
                     <div class="card-body">
                         <h3 class="mb-4">New Unit</h3>
                         <form method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
                                 <label class="form-label">Unit Name</label>
                                 <input type="text" name="name" id="unitName" class="form-control" placeholder="e.g., tablespoon, cup, pack" required>
