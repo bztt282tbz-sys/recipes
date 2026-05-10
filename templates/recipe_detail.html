@@ -173,11 +173,69 @@
                     </div>
                 </div>
                 {% endif %}
+                
+                {% if current_user.is_authenticated %}
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Actions</h5>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" onclick="checkShelf()">Check Shelf</button>
+                            <form action="{{ url_for('add_recipe_to_cart', recipe_id=recipe.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-success w-100">Add Missing to Cart</button>
+                            </form>
+                            <form action="{{ url_for('use_from_shelf', recipe_id=recipe.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-warning w-100">Use from Shelf</button>
+                            </form>
+                            <a href="{{ url_for('print_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-dark w-100" target="_blank">Download Recipe</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="shelfModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Shelf Check</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="shelfResults">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
     
     <script>
+        function checkShelf() {
+            fetch('{{ url_for("check_shelf", recipe_id=recipe.id) }}', {
+                credentials: 'same-origin'
+            })
+            .then(r => r.json())
+            .then(data => {
+                let html = '<ul class="list-group">';
+                data.results.forEach(r => {
+                    let badgeClass = r.status === 'has_enough' ? 'bg-success' : r.status === 'partial' ? 'bg-warning' : 'bg-danger';
+                    let statusText = r.status === 'has_enough' ? '✓ On shelf' : r.status === 'partial' ? '⚠ Partial' : '✗ Missing';
+                    let haveText = r.have ? ` (have ${r.have} ${r.unit ? r.unit.name : 'g'})` : '';
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        ${r.ingredient.name}${haveText}
+                        <span class="badge ${badgeClass}">${statusText}</span>
+                    </li>`;
+                });
+                html += '</ul>';
+                document.getElementById('shelfResults').innerHTML = html;
+                new bootstrap.Modal(document.getElementById('shelfModal')).show();
+            });
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
             var basePortions = parseFloat(document.getElementById('base-portions').value);
             var currentMultiplier = 1;

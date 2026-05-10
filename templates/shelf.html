@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Shelf - Recipe Vault</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('home') }}">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">My Shelf</li>
+            </ol>
+        </nav>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <h2>My Shelf</h2>
+                        <p class="text-muted">Manage ingredients you have at home</p>
+                        
+                        <form method="POST" class="row g-3 mb-4">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="add">
+                            <div class="col-md-4">
+                                <select name="ingredient_id" class="form-select" required>
+                                    <option value="">Select ingredient...</option>
+                                    {% for ing in all_ingredients %}
+                                    <option value="{{ ing.id }}">{{ ing.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" step="0.01" name="amount" class="form-control" placeholder="Amount" required>
+                            </div>
+                            <div class="col-md-2">
+                                <select name="unit_id" class="form-select">
+                                    <option value="">Unit</option>
+                                    {% for u in all_units %}
+                                    <option value="{{ u.id }}">{{ u.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" name="mhd" class="form-control" placeholder="MHD">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-primary">Add</button>
+                            </div>
+                        </form>
+
+                        {% if not items %}
+                        <div class="text-center py-5 text-muted">
+                            <p>Your shelf is empty.</p>
+                            <p>Add ingredients you have at home to track what you need to buy.</p>
+                        </div>
+                        {% else %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Ingredient</th>
+                                        <th>Amount</th>
+                                        <th>MHD</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                    <tr {% if item.mhd and item.mhd < today_date %}class="table-danger"{% endif %}>
+                                        <td>{{ item.ingredient.name }}</td>
+                                        <td>{{ item.amount }} {{ item.unit.name if item.unit else 'g' }}</td>
+                                        <td>
+                                            {% if item.mhd %}
+                                            {{ item.mhd.strftime('%d.%m.%Y') }}
+                                            {% if item.mhd < today_date %}
+                                            <span class="badge bg-danger">Expired</span>
+                                            {% elif (item.mhd - today_date).days < 7 %}
+                                            <span class="badge bg-warning">Soon</span>
+                                            {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h5>Tips</h5>
+                        <ul class="text-muted">
+                            <li>Add ingredients with their MHD to track expiration</li>
+                            <li>Red items are expired</li>
+                            <li>Yellow items expire within 7 days</li>
+                            <li>Use "Check Shelf" on recipes to see what you have</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

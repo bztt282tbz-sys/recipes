@@ -1,7 +1,8 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, abort, session
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from datetime import datetime, date
 import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -229,6 +230,52 @@ class RecipeStep(db.Model):
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
     step_number = db.Column(db.Integer, nullable=False)
     instruction = db.Column(db.Text, nullable=False)
+
+class ShelfItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ingredient_id = db.Column(db.Integer, db.ForeignKey('ingredient.id'), nullable=False)
+    unit_id = db.Column(db.Integer, db.ForeignKey('unit.id'), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    best_before = db.Column(db.Date, nullable=True)
+    mhd = db.Column(db.Date, nullable=True)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    ingredient = db.relationship('Ingredient', foreign_keys=[ingredient_id])
+    unit = db.relationship('Unit', foreign_keys=[unit_id])
+
+    @property
+    def amount_grams(self):
+        if not self.unit:
+            return self.amount
+        for ui in self.unit.ingredient_units:
+            if ui.ingredient_id == self.ingredient_id:
+                return round(self.amount * ui.grams_override, 2)
+        if self.unit.unit_type == 'volume':
+            density = self.ingredient.density if self.ingredient.density else 1.0
+            return round(self.amount * self.unit.grams_conversion * density, 2)
+        return round(self.amount * self.unit.grams_conversion, 2)
+
+class ShoppingCartItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ingredient_id = db.Column(db.Integer, db.ForeignKey('ingredient.id'), nullable=False)
+    unit_id = db.Column(db.Integer, db.ForeignKey('unit.id'), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    ingredient = db.relationship('Ingredient', foreign_keys=[ingredient_id])
+    unit = db.relationship('Unit', foreign_keys=[unit_id])
+
+    __table_args__ = (db.UniqueConstraint('ingredient_id', 'unit_id', 'creator_id'),)
+
+    @property
+    def amount_grams(self):
+        if not self.unit:
+            return self.amount
+        for ui in self.unit.ingredient_units:
+            if ui.ingredient_id == self.ingredient_id:
+                return round(self.amount * ui.grams_override, 2)
+        if self.unit.unit_type == 'volume':
+            density = self.ingredient.density if self.ingredient.density else 1.0
+            return round(self.amount * self.unit.grams_conversion * density, 2)
+        return round(self.amount * self.unit.grams_conversion, 2)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -658,6 +705,287 @@ def add_unit():
             return render_template('add_unit.html', all_ingredients=all_ingredients)
     
     return render_template('add_unit.html', all_ingredients=all_ingredients)
+
+@app.route("/shelf", methods=['GET', 'POST'])
+@login_required
+def shelf():
+    all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+    all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type} for u in Unit.query.filter_by(creator_id=current_user.id).all()]
+    all_units += [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type} for u in Unit.query.filter_by(creator_id=None).all()]
+    all_units = {u['id']: u for u in all_units}.values()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            ingredient_id = request.form.get('ingredient_id')
+            amount = request.form.get('amount')
+            unit_id = request.form.get('unit_id')
+            mhd = request.form.get('mhd')
+            
+            if not ingredient_id or not amount:
+                flash('Ingredient and amount required', 'danger')
+            else:
+                try:
+                    amount = float(amount)
+                    mhd_date = None
+                    if mhd:
+                        mhd_date = datetime.strptime(mhd, '%Y-%m-%d').date()
+                    
+                    item = ShelfItem(
+                        ingredient_id=int(ingredient_id),
+                        amount=amount,
+                        unit_id=int(unit_id) if unit_id and unit_id.strip() else None,
+                        mhd=mhd_date,
+                        creator_id=current_user.id
+                    )
+                    db.session.add(item)
+                    db.session.commit()
+                    flash('Item added to shelf!', 'success')
+                except ValueError:
+                    flash('Invalid amount', 'danger')
+        
+        elif action == 'delete':
+            item_id = request.form.get('item_id')
+            item = ShelfItem.query.get(item_id)
+            if item and item.creator_id == current_user.id:
+                db.session.delete(item)
+                db.session.commit()
+                flash('Item removed', 'success')
+    
+    items = ShelfItem.query.filter_by(creator_id=current_user.id).all()
+    today_date = date.today()
+    return render_template('shelf.html', items=items, all_ingredients=all_ingredients, all_units=all_units, today_date=today_date)
+
+@app.route("/shelf/add/<int:ingredient_id>", methods=['GET', 'POST'])
+@login_required
+def shelf_add_ingredient(ingredient_id):
+    ingredient = Ingredient.query.get_or_404(ingredient_id)
+    all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type} for u in Unit.query.filter_by(creator_id=current_user.id).all()]
+    all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type} for u in Unit.query.filter_by(creator_id=None).all() if u not in all_units] + all_units
+    
+    if request.method == 'POST':
+        amount = request.form.get('amount')
+        unit_id = request.form.get('unit_id')
+        mhd = request.form.get('mhd')
+        
+        if amount:
+            try:
+                amount = float(amount)
+                mhd_date = None
+                if mhd:
+                    mhd_date = datetime.strptime(mhd, '%Y-%m-%d').date()
+                
+                item = ShelfItem(
+                    ingredient_id=ingredient_id,
+                    amount=amount,
+                    unit_id=int(unit_id) if unit_id and unit_id.strip() else None,
+                    mhd=mhd_date,
+                    creator_id=current_user.id
+                )
+                db.session.add(item)
+                db.session.commit()
+                flash('Item added to shelf!', 'success')
+                return redirect(url_for('shelf'))
+            except ValueError:
+                flash('Invalid amount', 'danger')
+    
+    return render_template('shelf_add.html', ingredient=ingredient, all_units=all_units)
+
+@app.route("/shopping_cart", methods=['GET', 'POST'])
+@login_required
+def shopping_cart():
+    all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+    all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type} for u in Unit.query.all()]
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            ingredient_id = request.form.get('ingredient_id')
+            amount = request.form.get('amount')
+            unit_id = request.form.get('unit_id')
+            
+            if not ingredient_id or not amount:
+                flash('Ingredient and amount required', 'danger')
+            else:
+                try:
+                    amount = float(amount)
+                    existing = ShoppingCartItem.query.filter_by(
+                        ingredient_id=int(ingredient_id),
+                        unit_id=int(unit_id) if unit_id and unit_id.strip() else None,
+                        creator_id=current_user.id
+                    ).first()
+                    
+                    if existing:
+                        existing.amount += amount
+                    else:
+                        item = ShoppingCartItem(
+                            ingredient_id=int(ingredient_id),
+                            amount=amount,
+                            unit_id=int(unit_id) if unit_id and unit_id.strip() else None,
+                            creator_id=current_user.id
+                        )
+                        db.session.add(item)
+                    db.session.commit()
+                    flash('Item added to cart!', 'success')
+                except ValueError:
+                    flash('Invalid amount', 'danger')
+        
+        elif action == 'delete':
+            item_id = request.form.get('item_id')
+            item = ShoppingCartItem.query.get(item_id)
+            if item and item.creator_id == current_user.id:
+                db.session.delete(item)
+                db.session.commit()
+                flash('Item removed', 'success')
+        
+        elif action == 'copy_clipboard':
+            items = ShoppingCartItem.query.filter_by(creator_id=current_user.id).all()
+            if items:
+                lines = ["# Shopping List", ""]
+                for item in items:
+                    amount_str = f"{item.amount} {item.unit.name}" if item.unit else f"{item.amount}g"
+                    lines.append(f"- [ ] {item.ingredient.name}: {amount_str}")
+                clipboard_text = "\n".join(lines)
+                return clipboard_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+            flash('Cart is empty', 'warning')
+    
+    items = ShoppingCartItem.query.filter_by(creator_id=current_user.id).all()
+    return render_template('shopping_cart.html', items=items, all_ingredients=all_ingredients, all_units=all_units)
+
+@app.route("/recipe/<int:recipe_id>/check_shelf")
+@login_required
+def check_shelf(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    shelf_items = {si.ingredient_id: si for si in ShelfItem.query.filter_by(creator_id=current_user.id).all()}
+    
+    results = []
+    for ri in recipe.recipe_ingredients:
+        shelf_item = shelf_items.get(ri.ingredient_id)
+        if shelf_item:
+            if shelf_item.amount_grams >= ri.amount_grams:
+                results.append({'ingredient': ri.ingredient, 'status': 'has_enough', 'have': shelf_item.amount, 'need': ri.amount, 'unit': shelf_item.unit})
+            else:
+                results.append({'ingredient': ri.ingredient, 'status': 'partial', 'have': shelf_item.amount, 'need': ri.amount, 'unit': shelf_item.unit})
+        else:
+            results.append({'ingredient': ri.ingredient, 'status': 'missing', 'need': ri.amount})
+    
+    return {'results': results}
+
+@app.route("/recipe/<int:recipe_id>/add_to_cart", methods=['POST'])
+@login_required
+def add_recipe_to_cart(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    shelf_items = {si.ingredient_id: si for si in ShelfItem.query.filter_by(creator_id=current_user.id).all()}
+    cart_items = ShoppingCartItem.query.filter_by(creator_id=current_user.id).all()
+    cart_lookup = {(ci.ingredient_id, ci.unit_id): ci for ci in cart_items}
+    
+    added = []
+    for ri in recipe.recipe_ingredients:
+        shelf_item = shelf_items.get(ri.ingredient_id)
+        
+        missing_amount = ri.amount
+        if shelf_item and shelf_item.amount_grams >= ri.amount_grams:
+            continue
+        
+        if shelf_item:
+            missing_amount = ri.amount - (shelf_item.amount / ri.amount_grams * ri.amount_grams) if ri.amount_grams > 0 else 0
+        
+        if missing_amount <= 0:
+            continue
+        
+        key = (ri.ingredient_id, ri.unit_id)
+        existing = cart_lookup.get(key)
+        
+        if existing:
+            existing.amount += missing_amount
+        else:
+            new_item = ShoppingCartItem(
+                ingredient_id=ri.ingredient_id,
+                amount=missing_amount,
+                unit_id=ri.unit_id,
+                creator_id=current_user.id
+            )
+            db.session.add(new_item)
+        
+        added.append(f"{ri.ingredient.name}: {missing_amount:.1f} {ri.unit.name if ri.unit else 'g'}")
+    
+    db.session.commit()
+    
+    if added:
+        flash(f'Added to cart: {", ".join(added)}', 'success')
+    else:
+        flash('All ingredients available on shelf!', 'info')
+    
+    return redirect(url_for('shopping_cart'))
+
+@app.route("/recipe/<int:recipe_id>/use_from_shelf", methods=['POST'])
+@login_required
+def use_from_shelf(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    shelf_items = {si.ingredient_id: si for si in ShelfItem.query.filter_by(creator_id=current_user.id).all()}
+    
+    used = []
+    missing = []
+    for ri in recipe.recipe_ingredients:
+        shelf_item = shelf_items.get(ri.ingredient_id)
+        
+        if not shelf_item:
+            missing.append(ri.ingredient.name)
+            continue
+        
+        if shelf_item.amount_grams >= ri.amount_grams:
+            shelf_item.amount -= ri.amount / ri.amount_grams * shelf_item.amount_grams if ri.amount_grams > 0 else ri.amount
+            
+            if shelf_item.amount <= 0:
+                db.session.delete(shelf_item)
+            
+            used.append(f"{ri.ingredient.name}: {ri.amount} {ri.unit.name if ri.unit else 'g'}")
+        else:
+            missing.append(f"{ri.ingredient.name} (not enough)")
+    
+    db.session.commit()
+    
+    if used:
+        flash(f'Used from shelf: {", ".join(used)}', 'success')
+    if missing:
+        flash(f'Not on shelf: {", ".join(missing)}', 'warning')
+    
+    return redirect(url_for('recipe_detail', recipe_id=recipe_id))
+
+@app.route("/recipe/<int:recipe_id>/print")
+@login_required
+def print_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    
+    pdf_content = f"""# {recipe.title}
+
+{recipe.description or ''}
+
+**Portions:** {recipe.portions}
+
+---
+
+## Ingredients
+
+"""
+    for ri in recipe.recipe_ingredients:
+        amount_str = f"{ri.amount} {ri.unit.name}" if ri.unit else f"{ri.amount}g"
+        pdf_content += f"- {ri.ingredient.name}: {amount_str}\n"
+    
+    if recipe.steps:
+        pdf_content += "\n## Instructions\n\n"
+        for step in recipe.steps:
+            pdf_content += f"{step.step_number}. {step.instruction}\n\n"
+    
+    if recipe.instructions:
+        pdf_content += f"\n{recipe.instructions}\n"
+    
+    return pdf_content, 200, {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Disposition': f'attachment; filename="{recipe.title}.md"'
+    }
 
 if __name__ == '__main__':
     with app.app_context():
