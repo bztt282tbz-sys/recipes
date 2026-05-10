@@ -45,9 +45,22 @@
                         <h6>Ingredients for this step:</h6>
                         <ul class="list-group list-group-flush mb-2">
                             {% for ri in step_ings %}
+                            {% set ing_units = ri.ingredient.get_available_units() %}
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 {{ ri.ingredient.name }}
-                                <span class="badge bg-secondary rounded-pill">{{ ri.amount }} {{ ri.display_unit }}</span>
+                                <div class="dropdown">
+                                    <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ ri.ingredient.id }}" data-total-grams="{{ ri.amount_grams }}" data-original-amount="{{ ri.amount }}" data-original-unit="{{ ri.display_unit }}" data-density="{{ ri.ingredient.density or '' }}" data-density-unit="{{ ri.ingredient.density_unit or '' }}" data-grams-per-unit="{{ ri.ingredient.grams_per_unit or '' }}">
+                                        {{ ri.amount }} {{ ri.display_unit }}
+                                    </span>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ri.display_unit }} (original)</a></li>
+                                        {% for unit in ing_units %}
+                                        {% if ri.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                        <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
                             </li>
                             {% endfor %}
                         </ul>
