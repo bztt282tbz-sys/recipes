@@ -132,6 +132,13 @@ class Recipe(db.Model):
         aggregated = {}
         for ri in self.recipe_ingredients:
             ing_id = ri.ingredient_id
+            unit_grams = 1.0
+            if ri.unit:
+                if ri.unit.unit_type == 'volume':
+                    density = ri.ingredient.density if ri.ingredient.density else 1.0
+                    unit_grams = ri.unit.grams_conversion * density
+                else:
+                    unit_grams = ri.unit.grams_conversion
             if ing_id not in aggregated:
                 aggregated[ing_id] = {
                     'ingredient': ri.ingredient,
@@ -139,6 +146,7 @@ class Recipe(db.Model):
                     'total_grams': 0,
                     'display_unit': ri.display_unit,
                     'original_unit_id': ri.unit_id,
+                    'original_unit_grams': unit_grams,
                     'steps': [],
                     'available_units': ri.ingredient.get_available_units()
                 }
@@ -150,6 +158,7 @@ class Recipe(db.Model):
                     'amount': ri.amount,
                     'display_unit': ri.display_unit,
                     'grams': ri.amount_grams,
+                    'original_unit_grams': unit_grams,
                     'available_units': ri.ingredient.get_available_units()
                 })
         return list(aggregated.values())
