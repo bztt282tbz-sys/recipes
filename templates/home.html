@@ -85,6 +85,56 @@
         margin-bottom: 1rem;
         opacity: 0.5;
     }
+    .secondary-section {
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 2px dashed #e0e0e0;
+    }
+    .secondary-header {
+        font-family: 'Playfair Display', serif;
+        color: #95a5a6;
+        font-size: 1.25rem;
+    }
+    .secondary-card {
+        opacity: 0.7;
+    }
+    .secondary-card:hover {
+        opacity: 1;
+    }
+    .lang-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #e0e0e0;
+        color: #666;
+    }
+    .tag-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #d4edda;
+        color: #155724;
+        margin-right: 4px;
+    }
+    .grouped-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #6c5ce7;
+        color: white;
+        margin-left: 4px;
+    }
+    .lang-selector {
+        position: relative;
+        display: inline-block;
+    }
+    .lang-selector .dropdown-menu {
+        min-width: 80px;
+    }
+    .lang-selector .dropdown-item {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
 </style>
 {% endblock %}
 
@@ -92,7 +142,7 @@
 <div class="hero-section text-center">
     <h1 class="hero-title">{{ t('discover_recipes') }}</h1>
     <p class="hero-subtitle">{{ t('find_share') }}</p>
-    
+
     <form action="{{ url_for('home') }}" method="get" class="search-form">
         <div class="input-group">
             <input type="text" name="q" class="form-control search-input" placeholder="{{ t('search_recipes') }}" value="{{ search_query }}">
@@ -108,7 +158,7 @@
     <span class="text-muted">{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }}</span>
 </div>
 
-{% if not recipes %}
+{% if not recipes and not secondary_recipes %}
 <div class="empty-state">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -118,23 +168,43 @@
 </div>
 {% endif %}
 
+{% if recipes %}
 <div class="row">
     {% for recipe in recipes %}
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100 recipe-card shadow-sm">
             <div class="card-body">
-                <h5 class="card-title">{{ recipe.get_title() }}</h5>
-                <p class="card-text">{{ recipe.get_description()[:120] if recipe.get_description() else t('no_description') }}{% if recipe.get_description() and recipe.get_description()|length > 120 %}...{% endif %}</p>
+                <h5 class="card-title">{{ recipe.title }}</h5>
+                <p class="card-text">{{ (recipe.description or t('no_description'))[:120] }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
                 <div class="recipe-meta">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
                         <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
                     </svg>
                     <span>{{ recipe.author.username }}</span>
-                    {% if recipe.language_list|length > 1 %}
-                        <span class="badge bg-info ms-1 lang-badge">{{ recipe.language_list|join(',')|upper }}</span>
-                    {% endif %}
                     {% if recipe.is_draft and current_user.is_authenticated and recipe.creator_id == current_user.id %}
                         <span class="badge badge-draft ms-2">{{ t('draft') }}</span>
+                    {% endif %}
+                    {% for tag in recipe.tags %}
+                        <span class="tag-badge">{{ tag.tag.name }}</span>
+                    {% endfor %}
+                    {% if recipe.group_id %}
+                        <span class="grouped-badge">grouped</span>
+                        {% if recipe._group_variants %}
+                        <div class="lang-selector dropdown ms-1">
+                            <a class="lang-badge dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" style="text-decoration: none; cursor: pointer;">
+                                {{ recipe.language|upper }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% for variant in recipe._group_variants %}
+                                <li><a class="dropdown-item" href="{{ url_for('recipe_detail', recipe_id=variant.id) }}">{{ variant.language|upper }} - {{ variant.title }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% else %}
+                        <span class="lang-badge ms-1">{{ recipe.language|upper }}</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="lang-badge ms-1">{{ recipe.language|upper }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -148,4 +218,39 @@
     </div>
     {% endfor %}
 </div>
+{% endif %}
+
+{% if secondary_recipes %}
+<div class="secondary-section">
+    <h5 class="secondary-header mb-4">Other Languages ({{ secondary_recipes|length }})</h5>
+    <div class="row">
+        {% for recipe in secondary_recipes %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 recipe-card shadow-sm secondary-card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ recipe.title }}</h5>
+                    <p class="card-text">{{ (recipe.description or t('no_description'))[:120] }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
+                    <div class="recipe-meta">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                        </svg>
+                        <span>{{ recipe.author.username }}</span>
+                        {% for tag in recipe.tags %}
+                            <span class="tag-badge">{{ tag.tag.name }}</span>
+                        {% endfor %}
+                        <span class="lang-badge ms-1">{{ recipe.language|upper }}</span>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top-0">
+                    {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
+                    <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
+                    {% endif %}
+                    <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}

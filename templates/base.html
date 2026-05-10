@@ -33,22 +33,42 @@
     <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
-            <div class="d-flex align-items-center">
-                {% set current_path = request.full_path or '/' %}
-                {% for l, label in languages %}
-                <a href="{{ url_for('set_language', lang_code=l) }}?back_to={{ current_path|urlencode }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
-                {% endfor %}
-                {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('shelf') }}" class="btn btn-outline-light btn-sm">{{ t('shelf') }}</a>
-                    <a href="{{ url_for('shopping_cart') }}" class="btn btn-outline-light btn-sm">{{ t('cart') }}</a>
-                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">{{ t('add_recipe') }}</a>
-                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">{{ t('add_ingredient') }}</a>
-                    <a href="{{ url_for('add_unit') }}" class="btn btn-outline-light btn-sm">{{ t('add_unit') }}</a>
-                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">{{ t('logout') }}</a>
-                {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">{{ t('login') }}</a>
-                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">{{ t('register') }}</a>
-                {% endif %}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle btn-outline-light btn-sm" href="#" role="button" data-bs-toggle="dropdown">
+                            {{ t('add_recipe') }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('add_recipe') }}">{{ t('add_recipe') }}</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('add_ingredient') }}">{{ t('add_ingredient') }}</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('add_unit') }}">{{ t('add_unit') }}</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manage_data') }}">{{ t('manage_data') }}</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('settings') }}">{{ t('settings') }}</a></li>
+                            {% if current_user.is_admin %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_panel') }}">{{ t('admin_panel') }}</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="d-flex align-items-center">
+                    {% for l, label in languages %}
+                    <a href="{{ url_for('set_language', lang_code=l) }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
+                    {% endfor %}
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">{{ t('logout') }}</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">{{ t('login') }}</a>
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">{{ t('register') }}</a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </nav>

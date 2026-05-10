@@ -11,12 +11,16 @@
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
-                        <label class="form-label">{{ t('unit_name') }}</label>
+                        <label class="form-label">{{ t('unit_name') }} (English)</label>
                         <input type="text" name="name" id="unitName" class="form-control" placeholder="e.g., tablespoon, cup" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">{{ t('unit_name') }} (Russian)</label>
+                        <input type="text" name="name_ru" id="unitNameRu" class="form-control" placeholder="e.g., ст.л., чашка">
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">{{ t('unit_type') }}</label>
-                        <select name="unit_type" id="unitType" class="form-select" required onchange="updateLabels()">
+                        <select name="unit_type" id="unitType" class="form-select" required>
                             <option value="volume" selected>{{ t('volume') }}</option>
                             <option value="mass">{{ t('mass') }}</option>
                         </select>
@@ -25,32 +29,6 @@
                         <label class="form-label" id="conversionLabel">{{ t('grams_conversion') }}</label>
                         <input type="number" step="0.01" name="grams_conversion" class="form-control" placeholder="e.g., 15" required>
                     </div>
-
-                    <hr>
-                    <div class="alert alert-info">
-                        <strong>{{ t('tips') }}:</strong>
-                    </div>
-
-                    <h5>{{ t('available_units') }}</h5>
-                    <div id="ingredient-overrides" style="display: none;">
-                        <div class="row g-2 mb-2 override-row">
-                            <div class="col-md-6">
-                                <select name="ingredient_id[]" class="form-select">
-                                    <option value="">{{ t('ingredients') }}...</option>
-                                    {% for ing in all_ingredients %}
-                                    <option value="{{ ing.id }}">{{ ing.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <input type="number" step="0.01" name="grams_override[]" class="form-control" placeholder="{{ t('grams_conversion') }}">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
-                            </div>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm mb-3" onclick="addOverride()">+ {{ t('add_item') }}</button>
 
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('home') }}" class="btn btn-secondary">{{ t('cancel') }}</a>
@@ -61,40 +39,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-let ingredientsOptions = `{% for ing in all_ingredients %}<option value="{{ ing.id }}">{{ ing.name }}</option>{% endfor %}`;
-
-function updateLabels() {
-    const type = document.getElementById('unitType').value;
-    const label = document.getElementById('conversionLabel');
-    label.textContent = type === 'volume' ? 'ml per unit' : 'Grams per unit';
-}
-
-function addOverride() {
-    const container = document.getElementById('ingredient-overrides');
-    container.style.display = 'block';
-    const row = document.createElement('div');
-    row.className = 'row g-2 mb-2 override-row';
-    row.innerHTML = `
-        <div class="col-md-6">
-            <select name="ingredient_id[]" class="form-select">
-                <option value="">{{ t("ingredients") }}...</option>
-                ${ingredientsOptions}
-            </select>
-        </div>
-        <div class="col-md-4">
-            <input type="number" step="0.01" name="grams_override[]" class="form-control" placeholder="{{ t("grams_conversion") }}">
-        </div>
-        <div class="col-md-2">
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
-        </div>
-    `;
-    container.appendChild(row);
-}
-
-function removeRow(btn) { btn.closest('.override-row').remove(); }
-</script>
 {% endblock %}

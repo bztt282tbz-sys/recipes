@@ -2,13 +2,59 @@
 
 {% block title %}{{ t('edit_recipe') }} - Recipe Vault{% endblock %}
 
+{% block extra_css %}
+<style>
+    .tag-input {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 8px;
+        min-height: 38px;
+    }
+    .tag-chip {
+        display: inline-flex;
+        align-items: center;
+        background: #e9ecef;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin: 2px;
+        font-size: 0.875rem;
+    }
+    .tag-chip-remove {
+        margin-left: 6px;
+        cursor: pointer;
+        color: #dc3545;
+    }
+    .tag-dropdown {
+        position: absolute;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        width: 100%;
+        display: none;
+    }
+    .tag-dropdown-item {
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+    .tag-dropdown-item:hover {
+        background: #f8f9fa;
+    }
+    .tag-wrapper {
+        position: relative;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10">
         <div class="card shadow">
             <div class="card-body">
                 <h3 class="mb-4">{{ t('edit_recipe') }}</h3>
-                <form method="POST">
+                <form method="POST" onsubmit="prepareTags()">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label">{{ t('title') }}</label>
@@ -21,6 +67,49 @@
                     <div class="mb-3">
                         <label class="form-label">{{ t('portions') }}</label>
                         <input type="number" name="portions" class="form-control" value="{{ recipe.portions or 4 }}" min="0.5" step="0.5">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Language</label>
+                        <select name="language" class="form-select">
+                            <option value="en" {% if recipe.language=='en' %}selected{% endif %}>English</option>
+                            <option value="de" {% if recipe.language=='de' %}selected{% endif %}>Deutsch</option>
+                            <option value="ru" {% if recipe.language=='ru' %}selected{% endif %}>Russian</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Recipe Group</label>
+                        <div class="input-group">
+                            <select name="group_id" class="form-select" id="groupSelect">
+                                <option value="">No group (standalone)</option>
+                                {% for group_recipe in grouped_recipes %}
+                                <option value="{{ group_recipe.group_id }}" {% if recipe.group_id == group_recipe.group_id %}selected{% endif %}>
+                                    Group: {{ group_recipe.title[:30] }}... ({{ grouped_languages[group_recipe.group_id]|join(', ') }})
+                                </option>
+                                {% endfor %}
+                                <option value="__new_group__">+ Create new group</option>
+                            </select>
+                            {% if recipe.group_id %}
+                            <a href="{{ url_for('ungroup_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-danger" onclick="return confirm('Remove from group?')">Ungroup</a>
+                            {% endif %}
+                        </div>
+                        {% if recipe.group_id and grouped_variants %}
+                        <small class="text-muted mt-1 d-block">Other languages in this group:
+                            {% for v in grouped_variants %}
+                            <a href="{{ url_for('recipe_detail', recipe_id=v.id) }}" class="badge bg-secondary">{{ v.language|upper }}</a>
+                            {% endfor %}
+                        </small>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tags (comma separated or click to add)</label>
+                        <div class="tag-wrapper">
+                            <div class="tag-input" id="tagContainer" onclick="focusTagInput()">
+                                <input type="text" id="tagInput" placeholder="Type to search or create tags..." oninput="searchTags(this.value)" onkeydown="handleTagKeydown(event)" style="border: none; outline: none; width: 200px;">
+                            </div>
+                            <div class="tag-dropdown" id="tagDropdown"></div>
+                        </div>
+                        <input type="hidden" name="tag_ids[]" id="tagIds">
+                        <input type="hidden" name="new_tags" id="newTags">
                     </div>
 
                     <hr>
@@ -52,7 +141,7 @@
                                                 <option value="">{{ t("unit_type") }}...</option>
                                                 {% for unit in all_units %}
                                                 {% if not unit.is_bound or ri.ingredient_id in unit.ingredients %}
-                                                <option value="{{ unit.id }}" {% if unit.id == ri.unit_id %}selected{% endif %}>{{ unit.name }}</option>
+                                                <option value="{{ unit.id }}" {% if unit.id == ri.unit_id %}selected{% endif %}>{% if lang == 'ru' and unit.name_ru %}{{ unit.name_ru }}{% else %}{{ unit.name }}{% endif %}</option>
                                                 {% endif %}
                                                 {% endfor %}
                                             </select>
@@ -78,7 +167,7 @@
                     </div>
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-secondary">{{ t('cancel') }}</a>
-                        <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
+                        <button type="submit" class="btn btn-primary" onclick="prepareTags()">{{ t('save') }}</button>
                     </div>
                 </form>
             </div>
@@ -92,6 +181,7 @@
 let stepCount = {{ recipe.steps|length }};
 const allUnits = {{ all_units|tojson }};
 const allIngredients = {{ all_ingredients|tojson }};
+let selectedTags = [{% for tag in recipe.tags %}{% if not loop.last %},{% endif %}{id: {{ tag.tag_id }}, name: '{{ tag.tag.name }}'}{% endfor %}];
 
 function getUnitsForIngredient(ingredientId) {
     if (!ingredientId) return allUnits;
@@ -103,10 +193,12 @@ function getUnitsForIngredient(ingredientId) {
 
 function buildUnitsOptions(ingredientId, selectedId) {
     const units = getUnitsForIngredient(ingredientId);
+    const isRu = '{{ lang }}' === 'ru';
     let html = '<option value="">{{ t("unit_type") }}...</option>';
     units.forEach(unit => {
         const selected = unit.id === selectedId ? 'selected' : '';
-        html += `<option value="${unit.id}" ${selected}>${unit.name}</option>`;
+        const name = isRu && unit.name_ru ? unit.name_ru : unit.name;
+        html += `<option value="${unit.id}" ${selected}>${name}</option>`;
     });
     return html;
 }
@@ -169,5 +261,88 @@ function addStep() {
 
 function removeRow(btn) { btn.closest('.ingredient-row').remove(); }
 function removeStep(num) { document.getElementById('step-' + num).remove(); }
+
+function focusTagInput() {
+    document.getElementById('tagInput').focus();
+}
+
+function searchTags(query) {
+    const dropdown = document.getElementById('tagDropdown');
+    if (!query) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    fetch('/api/tags?q=' + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+            if (data.tags && data.tags.length > 0) {
+                dropdown.innerHTML = data.tags.map(t =>
+                    `<div class="tag-dropdown-item" onclick="addTag(${t.id}, '${t.name}')">${t.name}</div>`
+                ).join('');
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.innerHTML = `<div class="tag-dropdown-item" onclick="createNewTag('${query}')">Create "${query}"</div>`;
+                dropdown.style.display = 'block';
+            }
+        });
+}
+
+function addTag(id, name) {
+    if (!selectedTags.find(t => t.id === id)) {
+        selectedTags.push({id, name});
+        renderTags();
+    }
+    document.getElementById('tagInput').value = '';
+    document.getElementById('tagDropdown').style.display = 'none';
+}
+
+function createNewTag(name) {
+    if (!selectedTags.find(t => t.name === name)) {
+        selectedTags.push({id: null, name: name, isNew: true});
+        renderTags();
+    }
+    document.getElementById('tagInput').value = '';
+    document.getElementById('tagDropdown').style.display = 'none';
+}
+
+function removeTag(index) {
+    selectedTags.splice(index, 1);
+    renderTags();
+}
+
+function renderTags() {
+    const container = document.getElementById('tagContainer');
+    container.innerHTML = selectedTags.map((t, i) =>
+        `<span class="tag-chip">${t.name}<span class="tag-chip-remove" onclick="removeTag(${i})">x</span></span>`
+    ).join('') + `<input type="text" id="tagInput" placeholder="Type to search or create tags..." oninput="searchTags(this.value)" onkeydown="handleTagKeydown(event)" style="border: none; outline: none; width: 200px;">`;
+}
+
+function handleTagKeydown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = e.target.value.trim().replace(',', '');
+        if (val) {
+            createNewTag(val);
+        }
+    }
+    if (e.key === 'Backspace' && !e.target.value && selectedTags.length > 0) {
+        removeTag(selectedTags.length - 1);
+    }
+}
+
+function prepareTags() {
+    const existingTags = selectedTags.filter(t => t.id !== null).map(t => t.id);
+    const newTags = selectedTags.filter(t => t.isNew).map(t => t.name).join(',');
+    document.getElementById('tagIds').value = existingTags.join(',');
+    document.getElementById('newTags').value = newTags;
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.tag-wrapper')) {
+        document.getElementById('tagDropdown').style.display = 'none';
+    }
+});
+
+renderTags();
 </script>
 {% endblock %}
