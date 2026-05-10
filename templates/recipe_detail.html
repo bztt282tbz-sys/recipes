@@ -5,6 +5,10 @@
     <title>{{ recipe.title }} - Recipe Vault</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .badge-clickable { cursor: pointer; }
+        .badge-clickable:hover { opacity: 0.8; }
+    </style>
 </head>
 <body class="bg-light">
     <div class="container mt-5">
@@ -55,6 +59,20 @@
             </div>
 
             <div class="col-md-4">
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="card-title mb-0">Portions</h4>
+                            <div class="input-group input-group-sm" style="width: 120px;">
+                                <button class="btn btn-outline-secondary" type="button" onclick="adjustPortions(-0.5)">-</button>
+                                <input type="number" id="portionsInput" class="form-control text-center" value="{{ recipe.portions or 4 }}" min="0.5" step="0.5" onchange="updatePortions()">
+                                <button class="btn btn-outline-secondary" type="button" onclick="adjustPortions(0.5)">+</button>
+                            </div>
+                        </div>
+                        <small class="text-muted">Original recipe: {{ recipe.portions or 4 }} portions</small>
+                    </div>
+                </div>
+
                 {% if recipe.aggregated_ingredients %}
                 <div class="card shadow mb-4">
                     <div class="card-body">
@@ -65,14 +83,50 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <a class="text-decoration-none text-dark" data-bs-toggle="collapse" href="#ing-{{ agg.ingredient.id }}" role="button" aria-expanded="false">
                                         {{ agg.ingredient.name }}
+                                        {% if agg.ingredient.comment %}
+                                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-title="{{ agg.ingredient.comment }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle text-muted" viewBox="0 0 16 16">
+                                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                                            </svg>
+                                        </span>
+                                        {% endif %}
                                     </a>
-                                    <span class="badge bg-primary rounded-pill">{{ agg.total_amount }} {{ agg.display_unit }}</span>
+                                    <div class="dropdown">
+                                        <span class="badge bg-primary rounded-pill badge-clickable portions-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ agg.total_grams }}" data-original-amount="{{ agg.total_amount }}" data-original-unit="{{ agg.display_unit }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}" data-original-portions="{{ recipe.portions or 4 }}">
+                                            {{ agg.total_amount }} {{ agg.display_unit }}
+                                        </span>
+                                        <ul class="dropdown-menu dropdown-menu-end" id="unit-menu-{{ agg.ingredient.id }}">
+                                            <li><h6 class="dropdown-header">Convert to</h6></li>
+                                            <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ agg.display_unit }} (original)</a></li>
+                                            {% for unit in agg.available_units %}
+                                            {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                            <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                 </div>
                                 {% if agg.steps|length > 0 %}
                                 <div class="collapse mt-2" id="ing-{{ agg.ingredient.id }}">
                                     <small class="text-muted">
                                         {% for step in agg.steps %}
-                                        <div>Step {{ step.step_number }}: {{ step.amount }} {{ step.display_unit }}</div>
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span>Step {{ step.step_number }}: </span>
+                                            <div class="dropdown d-inline">
+                                                <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ step.grams }}" data-original-amount="{{ step.amount }}" data-original-unit="{{ step.display_unit }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
+                                                    {{ step.amount }} {{ step.display_unit }}
+                                                </span>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ step.display_unit }} (original)</a></li>
+                                                    {% for unit in step.available_units %}
+                                                    {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
+                                                    {% endif %}
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </div>
                                         {% endfor %}
                                     </small>
                                 </div>
@@ -94,5 +148,153 @@
             </div>
         </div>
     </div>
+    <script>
+        var originalPortions = {{ recipe.portions or 4 }};
+        
+        function adjustPortions(delta) {
+            var input = document.getElementById('portionsInput');
+            var newValue = parseFloat(input.value) + delta;
+            if (newValue >= 0.5) {
+                input.value = newValue;
+                updatePortions();
+            }
+        }
+        
+        function updatePortions() {
+            var input = document.getElementById('portionsInput');
+            var newPortions = parseFloat(input.value);
+            var scaleFactor = newPortions / originalPortions;
+            
+            document.querySelectorAll('.portions-badge').forEach(function(badge) {
+                var totalGrams = parseFloat(badge.dataset.totalGrams);
+                var originalAmount = parseFloat(badge.dataset.originalAmount);
+                var displayUnit = badge.dataset.originalUnit;
+                var currentUnitId = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitId || 'original';
+                var currentUnitName = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitName || displayUnit;
+                var currentUnitType = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitType || 'mass';
+                var gramsConv = parseFloat(badge.closest('.dropdown-menu').querySelector('.active')?.dataset.grams) || 1;
+                var densityUnit = badge.dataset.densityUnit;
+                var density = parseFloat(badge.dataset.density) || 1.0;
+                var gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
+                
+                var newAmount = originalAmount * scaleFactor;
+                var newText;
+                
+                if (currentUnitId === 'original') {
+                    newText = Math.round(newAmount * 100) / 100 + ' ' + displayUnit;
+                } else {
+                    var newGrams = totalGrams * scaleFactor;
+                    if (currentUnitType === 'mass') {
+                        newText = Math.round(newGrams / gramsConv * 100) / 100 + ' ' + currentUnitName;
+                    } else if (currentUnitType === 'volume') {
+                        if (densityUnit === 'g/unit' && gramsPerUnit) {
+                            newText = Math.round(newGrams / gramsPerUnit * 100) / 100 + ' ' + currentUnitName;
+                        } else {
+                            newText = Math.round(newGrams / gramsConv / density * 100) / 100 + ' ' + currentUnitName;
+                        }
+                    } else {
+                        newText = Math.round(newGrams / gramsConv * 100) / 100 + ' ' + currentUnitName;
+                    }
+                }
+                
+                badge.textContent = newText;
+            });
+            
+            document.querySelectorAll('.step-badge').forEach(function(badge) {
+                var stepGrams = parseFloat(badge.dataset.totalGrams);
+                var stepOriginalAmount = parseFloat(badge.dataset.originalAmount);
+                var displayUnit = badge.dataset.originalUnit;
+                var currentUnitId = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitId || 'original';
+                var currentUnitName = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitName || displayUnit;
+                var currentUnitType = badge.closest('.dropdown-menu').querySelector('.active')?.dataset.unitType || 'mass';
+                var gramsConv = parseFloat(badge.closest('.dropdown-menu').querySelector('.active')?.dataset.grams) || 1;
+                var densityUnit = badge.dataset.densityUnit;
+                var density = parseFloat(badge.dataset.density) || 1.0;
+                var gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
+                
+                var newAmount = stepOriginalAmount * scaleFactor;
+                var newText;
+                
+                if (currentUnitId === 'original') {
+                    newText = Math.round(newAmount * 100) / 100 + ' ' + displayUnit;
+                } else {
+                    var newGrams = stepGrams * scaleFactor;
+                    if (currentUnitType === 'mass') {
+                        newText = Math.round(newGrams / gramsConv * 100) / 100 + ' ' + currentUnitName;
+                    } else if (currentUnitType === 'volume') {
+                        if (densityUnit === 'g/unit' && gramsPerUnit) {
+                            newText = Math.round(newGrams / gramsPerUnit * 100) / 100 + ' ' + currentUnitName;
+                        } else {
+                            newText = Math.round(newGrams / gramsConv / density * 100) / 100 + ' ' + currentUnitName;
+                        }
+                    } else {
+                        newText = Math.round(newGrams / gramsConv * 100) / 100 + ' ' + currentUnitName;
+                    }
+                }
+                
+                badge.textContent = newText;
+            });
+        }
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            document.querySelectorAll('.dropdown-item[data-unit-id]').forEach(function(item) {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const menu = this.closest('.dropdown-menu');
+                    const badge = menu.parentElement.querySelector('.badge');
+                    const ingId = badge.dataset.ingId;
+                    
+                    const totalGrams = parseFloat(badge.dataset.totalGrams);
+                    const originalAmount = parseFloat(badge.dataset.originalAmount);
+                    const originalUnit = badge.dataset.originalUnit;
+                    const densityUnit = badge.dataset.densityUnit;
+                    const density = parseFloat(badge.dataset.density) || 1.0;
+                    const gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
+                    
+                    const unitId = this.dataset.unitId;
+                    const unitName = this.dataset.unitName;
+                    const unitType = this.dataset.unitType;
+                    const gramsConv = parseFloat(this.dataset.grams);
+                    
+                    if (unitId === 'original') {
+                        document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                            const bOriginalAmount = parseFloat(b.dataset.originalAmount);
+                            const bOriginalUnit = b.dataset.originalUnit;
+                            b.textContent = bOriginalAmount + ' ' + bOriginalUnit;
+                        });
+                    } else {
+                        document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                            const bTotalGrams = parseFloat(b.dataset.totalGrams);
+                            let stepDisplayAmount;
+                            if (unitType === 'mass') {
+                                stepDisplayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
+                            } else if (unitType === 'volume') {
+                                if (densityUnit === 'g/unit' && gramsPerUnit) {
+                                    stepDisplayAmount = Math.round(bTotalGrams / gramsPerUnit * 100) / 100;
+                                } else {
+                                    stepDisplayAmount = Math.round(bTotalGrams / gramsConv / density * 100) / 100;
+                                }
+                            } else {
+                                stepDisplayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
+                            }
+                            b.textContent = stepDisplayAmount + ' ' + unitName;
+                        });
+                    }
+                    
+                    document.querySelectorAll('.dropdown-menu').forEach(function(m) {
+                        m.querySelectorAll('.dropdown-item').forEach(function(i) {
+                            i.classList.remove('active');
+                        });
+                    });
+                    this.classList.add('active');
+                });
+            });
+        });
+    </script>
 </body>
 </html>

@@ -57,8 +57,45 @@ class Ingredient(db.Model):
     density_unit = db.Column(db.String(10), default='g/ml')
     grams_per_unit = db.Column(db.Float, nullable=True)
     unit_name = db.Column(db.String(30), nullable=True)
+    preferred_unit_id = db.Column(db.Integer, db.ForeignKey('unit.id'), nullable=True)
+    preferred_unit = db.relationship('Unit', foreign_keys=[preferred_unit_id])
+    comment = db.Column(db.String(100), nullable=True)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     unit_associations = db.relationship('UnitIngredient', backref='ingredient', cascade="all, delete-orphan", lazy=True)
+
+    def get_available_units(self):
+        units = Unit.query.all()
+        available = []
+        for unit in units:
+            if unit.is_bound:
+                for ui in unit.ingredient_units:
+                    if ui.ingredient_id == self.id:
+                        available.append({
+                            'id': unit.id,
+                            'name': unit.name,
+                            'unit_type': unit.unit_type,
+                            'grams_conversion': unit.grams_conversion,
+                            'is_bound': True
+                        })
+                        break
+            else:
+                available.append({
+                    'id': unit.id,
+                    'name': unit.name,
+                    'unit_type': unit.unit_type,
+                    'grams_conversion': unit.grams_conversion,
+                    'is_bound': False
+                })
+        return available
+
+    def get_grams_conversion_for_unit(self, unit_id):
+        for ui in self.unit_associations:
+            if ui.unit_id == unit_id:
+                return ui.grams_override
+        unit = Unit.query.get(unit_id)
+        if unit:
+            return unit.grams_conversion
+        return None
 
 class UnitIngredient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,6 +111,7 @@ class Recipe(db.Model):
     description = db.Column(db.Text, nullable=True)
     instructions = db.Column(db.Text, nullable=True)
     is_draft = db.Column(db.Boolean, default=True)
+    portions = db.Column(db.Float, default=1)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipe_ingredients = db.relationship('RecipeIngredient', backref='recipe', cascade="all, delete-orphan", lazy=True)
     steps = db.relationship('RecipeStep', backref='recipe', cascade="all, delete-orphan", lazy=True, order_by='RecipeStep.step_number')
@@ -100,7 +138,9 @@ class Recipe(db.Model):
                     'total_amount': 0,
                     'total_grams': 0,
                     'display_unit': ri.display_unit,
-                    'steps': []
+                    'original_unit_id': ri.unit_id,
+                    'steps': [],
+                    'available_units': ri.ingredient.get_available_units()
                 }
             aggregated[ing_id]['total_amount'] += ri.amount
             aggregated[ing_id]['total_grams'] += ri.amount_grams
@@ -108,7 +148,9 @@ class Recipe(db.Model):
                 aggregated[ing_id]['steps'].append({
                     'step_number': ri.step_number,
                     'amount': ri.amount,
-                    'display_unit': ri.display_unit
+                    'display_unit': ri.display_unit,
+                    'grams': ri.amount_grams,
+                    'available_units': ri.ingredient.get_available_units()
                 })
         return list(aggregated.values())
 
@@ -164,18 +206,27 @@ def load_user(user_id):
 
 @app.route("/")
 def home():
+    search_query = request.args.get('q', '')
+    
     if current_user.is_authenticated:
-        # Show non-drafts OR drafts owned by the user
         recipes = Recipe.query.filter(
             (Recipe.is_draft == False) | (Recipe.creator_id == current_user.id)
-        ).order_by(Recipe.id.desc()).all()
+        )
     else:
-        recipes = Recipe.query.filter_by(is_draft=False).order_by(Recipe.id.desc()).all()
-    return render_template('home.html', recipes=recipes)
+        recipes = Recipe.query.filter_by(is_draft=False)
+    
+    if search_query:
+        recipes = recipes.filter(Recipe.title.ilike(f'%{search_query}%'))
+    
+    recipes = recipes.order_by(Recipe.id.desc()).all()
+    return render_template('home.html', recipes=recipes, search_query=search_query)
 
 @app.route("/recipe/<int:recipe_id>")
-@login_required
 def recipe_detail(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.is_draft and (not current_user.is_authenticated or recipe.creator_id != current_user.id):
+        abort(404)
+    return render_template('recipe_detail.html', recipe=recipe)
     recipe = Recipe.query.get_or_404(recipe_id)
     return render_template('recipe_detail.html', recipe=recipe)
 
@@ -187,12 +238,14 @@ def add_recipe():
         description = request.form.get('description')
         instructions = request.form.get('instructions') or ''
         is_draft = True if request.form.get('is_draft') else False
+        portions = float(request.form.get('portions')) if request.form.get('portions') else 1
 
         new_recipe = Recipe(
             title=title,
             description=description,
             instructions=instructions,
             is_draft=is_draft,
+            portions=portions,
             creator_id=current_user.id
         )
         db.session.add(new_recipe)
@@ -233,11 +286,11 @@ def add_recipe():
         except Exception as e:
             db.session.rollback()
             flash(f'Error creating recipe: {str(e)}', 'danger')
-            all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+            all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
             all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
             return render_template('add_recipe.html', all_ingredients=all_ingredients, all_units=all_units)
 
-    all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+    all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
     all_units = []
     for u in Unit.query.all():
         unit_data = {
@@ -263,6 +316,7 @@ def edit_recipe(recipe_id):
         recipe.description = request.form.get('description')
         recipe.instructions = request.form.get('instructions') or ''
         recipe.is_draft = True if request.form.get('is_draft') else False
+        recipe.portions = float(request.form.get('portions')) if request.form.get('portions') else 1
 
         RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
         RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
@@ -281,7 +335,8 @@ def edit_recipe(recipe_id):
                     ingredient_id=int(ing_ids[i]),
                     amount=float(amounts[i]),
                     unit_id=int(unit_id_val) if unit_id_val and unit_id_val.strip() else None,
-                    step_number=int(step_num_str) if step_num_str and step_num_str.strip() else None
+                    step_number=int(step_num_str) if step_num_str and step_num_str.strip() else None,
+                    comment=comment_val
                 )
                 db.session.add(ri)
 
@@ -302,11 +357,11 @@ def edit_recipe(recipe_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating recipe: {str(e)}', 'danger')
-            all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+            all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
             all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
             return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units)
 
-    all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+    all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
     all_units = [{'id': u.id, 'name': u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
     return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units)
 
@@ -373,6 +428,7 @@ def add_ingredient():
         density = None
         grams_per_unit = None
         unit_name = None
+        preferred_unit_id = None
         
         if density_type == 'g/ml':
             density = float(request.form.get('density')) if request.form.get('density') else None
@@ -380,15 +436,40 @@ def add_ingredient():
             grams_per_unit = float(request.form.get('grams_per_unit')) if request.form.get('grams_per_unit') else None
             unit_name = request.form.get('unit_name') or None
         
+        comment = request.form.get('comment') or None
+        
         new_ingredient = Ingredient(
             name=name,
             density=density,
             density_unit=density_type,
             grams_per_unit=grams_per_unit,
             unit_name=unit_name,
+            comment=comment,
             creator_id=current_user.id
         )
         db.session.add(new_ingredient)
+        db.session.flush()
+        
+        if density_type == 'g/unit' and unit_name:
+            new_unit = Unit(
+                name=unit_name,
+                unit_type='count',
+                grams_conversion=grams_per_unit,
+                is_bound=True,
+                creator_id=current_user.id
+            )
+            db.session.add(new_unit)
+            db.session.flush()
+            
+            new_ingredient.preferred_unit_id = new_unit.id
+            
+            ui = UnitIngredient(
+                unit_id=new_unit.id,
+                ingredient_id=new_ingredient.id,
+                grams_override=grams_per_unit
+            )
+            db.session.add(ui)
+        
         try:
             db.session.commit()
             flash('Ingredient added!', 'success')
@@ -401,7 +482,7 @@ def add_ingredient():
 @app.route("/unit/new", methods=['GET', 'POST'])
 @login_required
 def add_unit():
-    all_ingredients = [{'id': i.id, 'name': i.name} for i in Ingredient.query.all()]
+    all_ingredients = [{'id': i.id, 'name': i.name, 'preferred_unit_id': i.preferred_unit_id} for i in Ingredient.query.all()]
     if request.method == 'POST':
         name = request.form.get('name')
         unit_type = request.form.get('unit_type')
@@ -444,9 +525,143 @@ def add_unit():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        if not Unit.query.filter_by(name='g').first():
-            db.session.add(Unit(name='g', unit_type='mass', grams_conversion=1.0, creator_id=1))
-        if not Unit.query.filter_by(name='mL').first():
-            db.session.add(Unit(name='mL', unit_type='volume', grams_conversion=1.0, creator_id=1))
+        
+        g_unit = Unit.query.filter_by(name='g').first()
+        if not g_unit:
+            g_unit = Unit(name='g', unit_type='mass', grams_conversion=1.0, creator_id=1)
+            db.session.add(g_unit)
+        
+        ml_unit = Unit.query.filter_by(name='mL').first()
+        if not ml_unit:
+            ml_unit = Unit(name='mL', unit_type='volume', grams_conversion=1.0, creator_id=1)
+            db.session.add(ml_unit)
+        
+        tbsp_unit = Unit.query.filter_by(name='EL').first()
+        if not tbsp_unit:
+            tbsp_unit = Unit(name='EL', unit_type='volume', grams_conversion=15.0, creator_id=1)
+            db.session.add(tbsp_unit)
+        
+        tsp_unit = Unit.query.filter_by(name='TL').first()
+        if not tsp_unit:
+            tsp_unit = Unit(name='TL', unit_type='volume', grams_conversion=5.0, creator_id=1)
+            db.session.add(tsp_unit)
+        
         db.session.commit()
+        
+        user = User.query.first()
+        if not user:
+            user = User(username='demo', password=bcrypt.generate_password_hash('demo').decode('utf-8'))
+            db.session.add(user)
+            db.session.commit()
+        
+        if not Ingredient.query.filter_by(name='Mehl (Type 405)').first():
+            mehl = Ingredient(
+                name='Mehl (Type 405)',
+                density=0.55,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(mehl)
+            db.session.flush()
+            
+            kakao = Ingredient(
+                name='Backkakao',
+                density=0.4,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(kakao)
+            db.session.flush()
+            
+            zucker = Ingredient(
+                name='Zucker',
+                density=0.85,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(zucker)
+            db.session.flush()
+            
+            oel = Ingredient(
+                name='Speiseöl',
+                density=0.92,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(oel)
+            db.session.commit()
+        
+        if not Recipe.query.filter_by(title='Schokoladenkuchen').first():
+            mehl = Ingredient.query.filter_by(name='Mehl (Type 405)').first()
+            kakao = Ingredient.query.filter_by(name='Backkakao').first()
+            zucker = Ingredient.query.filter_by(name='Zucker').first()
+            oel = Ingredient.query.filter_by(name='Speiseöl').first()
+            
+            recipe = Recipe(
+                title='Schokoladenkuchen',
+                description='Ein saftiger Schokoladenkuchen mit Kakaopulver, gebacken in einer Springform (Ø 20 cm).',
+                instructions='Kuchen nach dem vollständigen Auskühlen nach Belieben mit Puderzucker bestreuen.',
+                is_draft=False,
+                portions=4,
+                creator_id=user.id
+            )
+            db.session.add(recipe)
+            db.session.flush()
+            
+            ri1 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=mehl.id, amount=250, unit_id=g_unit.id, step_number=1)
+            db.session.add(ri1)
+            
+            ri2 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=kakao.id, amount=3, unit_id=tbsp_unit.id, step_number=1)
+            db.session.add(ri2)
+            
+            bp = Ingredient(
+                name='Backpulver',
+                density=0.9,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(bp)
+            db.session.flush()
+            
+            ri3 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=bp.id, amount=2.5, unit_id=tsp_unit.id, step_number=1)
+            db.session.add(ri3)
+            
+            ri4 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=zucker.id, amount=180, unit_id=g_unit.id, step_number=2)
+            db.session.add(ri4)
+            
+            ri5 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=oel.id, amount=100, unit_id=ml_unit.id, step_number=2)
+            db.session.add(ri5)
+            
+            wasser = Ingredient(
+                name='Wasser',
+                density=1.0,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(wasser)
+            db.session.flush()
+            
+            ri6 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=wasser.id, amount=250, unit_id=ml_unit.id, step_number=2)
+            db.session.add(ri6)
+            
+            vanille = Ingredient(
+                name='Vanilleextrakt',
+                density=1.06,
+                density_unit='g/ml',
+                creator_id=user.id
+            )
+            db.session.add(vanille)
+            db.session.flush()
+            
+            ri7 = RecipeIngredient(recipe_id=recipe.id, ingredient_id=vanille.id, amount=1, unit_id=tsp_unit.id, step_number=2)
+            db.session.add(ri7)
+            
+            step1 = RecipeStep(recipe_id=recipe.id, step_number=1, instruction='Ofen auf 180 Grad Ober-/Unterhitze (Umluft: 160 Grad) vorheizen. Springform (Ø 20 cm) mit etwas Öl einfetten. Mehl mit Backpulver und Kakaopulver vermischen.')
+            db.session.add(step1)
+            
+            step2 = RecipeStep(recipe_id=recipe.id, step_number=2, instruction='Mischung mit den restlichen Zutaten zusammengeben und alles gut miteinander verrühren. Teig in die Springform geben. Kuchen im vorgeheizten Ofen ca. 35 Min. backen. Mit einem Holzstäbchen prüfen, ob der Kuchen durchgebacken ist. Kuchen vollständig auskühlen lassen.')
+            db.session.add(step2)
+            
+            db.session.commit()
+        
     app.run(debug=True, port=8001)

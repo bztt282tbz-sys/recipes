@@ -21,6 +21,10 @@
                                 <label class="form-label">Description</label>
                                 <textarea name="description" class="form-control" rows="2"></textarea>
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label">Portions (servings)</label>
+                                <input type="number" name="portions" class="form-control" value="4" min="0.5" step="0.5">
+                            </div>
 
                             <hr>
                             <h5>Steps</h5>
@@ -57,11 +61,12 @@
             });
         }
 
-        function buildUnitsOptions(ingredientId) {
+        function buildUnitsOptions(ingredientId, preferredUnitId) {
             const units = getUnitsForIngredient(ingredientId);
             let html = '<option value="">Select unit...</option>';
             units.forEach(unit => {
-                html += `<option value="${unit.id}">${unit.name} (${unit.unit_type})</option>`;
+                const selected = unit.id === preferredUnitId ? ' selected' : '';
+                html += `<option value="${unit.id}"${selected}>${unit.name} (${unit.unit_type})</option>`;
             });
             return html;
         }
@@ -85,7 +90,7 @@
                         <option value="">Select unit...</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <input type="hidden" name="step_num[]" value="${stepNum}">
                     <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
                 </div>
@@ -97,7 +102,9 @@
             const row = select.closest('.ingredient-row');
             const unitSelect = row.querySelector('.unit-select');
             const ingredientId = select.value;
-            unitSelect.innerHTML = buildUnitsOptions(ingredientId);
+            const ing = allIngredients.find(i => i.id === parseInt(ingredientId));
+            const preferredUnitId = ing ? ing.preferred_unit_id : null;
+            unitSelect.innerHTML = buildUnitsOptions(ingredientId, preferredUnitId);
         }
 
         function addStep() {

@@ -21,6 +21,10 @@
                                 <label class="form-label">Description</label>
                                 <textarea name="description" class="form-control" rows="2">{{ recipe.description or '' }}</textarea>
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label">Portions (servings)</label>
+                                <input type="number" name="portions" class="form-control" value="{{ recipe.portions or 4 }}" min="0.5" step="0.5">
+                            </div>
 
                             <hr>
                             <h5>Steps</h5>
@@ -56,7 +60,7 @@
                                                         {% endfor %}
                                                     </select>
                                                 </div>
-                                                <div class="col-md-2">
+                                                <div class="col-md-3">
                                                     <input type="hidden" name="step_num[]" value="{{ step.step_number }}">
                                                     <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
                                                 </div>
@@ -128,7 +132,7 @@
                         <option value="">Select unit...</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <input type="hidden" name="step_num[]" value="${stepNum}">
                     <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
                 </div>
@@ -140,7 +144,9 @@
             const row = select.closest('.ingredient-row');
             const unitSelect = row.querySelector('.unit-select');
             const ingredientId = select.value;
-            unitSelect.innerHTML = buildUnitsOptions(ingredientId, null);
+            const ing = allIngredients.find(i => i.id === parseInt(ingredientId));
+            const preferredUnitId = ing ? ing.preferred_unit_id : null;
+            unitSelect.innerHTML = buildUnitsOptions(ingredientId, preferredUnitId);
         }
 
         function addStep() {
