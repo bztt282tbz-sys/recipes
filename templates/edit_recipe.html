@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>New Recipe - Recipe Vault</title>
+    <title>Edit Recipe - Recipe Vault</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -11,31 +11,73 @@
             <div class="col-md-10">
                 <div class="card shadow">
                     <div class="card-body">
-                        <h3 class="mb-4">Create New Recipe</h3>
+                        <h3 class="mb-4">Edit Recipe</h3>
                         <form method="POST">
                             <div class="mb-3">
                                 <label class="form-label">Recipe Title</label>
-                                <input type="text" name="title" class="form-control" required>
+                                <input type="text" name="title" class="form-control" value="{{ recipe.title }}" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Description</label>
-                                <textarea name="description" class="form-control" rows="2"></textarea>
+                                <textarea name="description" class="form-control" rows="2">{{ recipe.description or '' }}</textarea>
                             </div>
 
                             <hr>
                             <h5>Steps</h5>
-                            <p class="text-muted small">Add steps with instructions and their specific ingredients.</p>
                             <div id="steps-container">
+                                {% for step in recipe.steps %}
+                                <div class="card mb-3" id="step-{{ step.step_number }}">
+                                    <div class="card-body">
+                                        <h6>Step {{ step.step_number }}</h6>
+                                        <div class="mb-3">
+                                            <textarea name="step_instruction[]" class="form-control" rows="2">{{ step.instruction }}</textarea>
+                                        </div>
+                                        <div id="step-{{ step.step_number }}-ingredients">
+                                            {% for ri in recipe.steps_dict.get(step.step_number, []) %}
+                                            <div class="row g-2 mb-2 ingredient-row">
+                                                <div class="col-md-5">
+                                                    <select name="ing_id[]" class="form-select ingredient-select" onchange="updateUnitDropdown(this)">
+                                                        <option value="">Select ingredient...</option>
+                                                        {% for ing in all_ingredients %}
+                                                        <option value="{{ ing.id }}" {% if ing.id == ri.ingredient_id %}selected{% endif %}>{{ ing.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <input type="number" step="0.01" name="amount[]" class="form-control" value="{{ ri.amount }}">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <select name="unit_id[]" class="form-select unit-select">
+                                                        <option value="">Select unit...</option>
+                                                        {% for unit in all_units %}
+                                                        {% if not unit.is_bound or ri.ingredient_id in unit.ingredients %}
+                                                        <option value="{{ unit.id }}" {% if unit.id == ri.unit_id %}selected{% endif %}>{{ unit.name }} ({{ unit.unit_type }})</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="hidden" name="step_num[]" value="{{ step.step_number }}">
+                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addIngredient({{ step.step_number }})">+ Add Ingredient</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm ms-2" onclick="removeStep({{ step.step_number }})">Remove Step</button>
+                                    </div>
+                                </div>
+                                {% endfor %}
                             </div>
                             <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="addStep()">+ Add Step</button>
 
                             <div class="mb-3 form-check">
-                                <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck">
+                                <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck" {% if recipe.is_draft %}checked{% endif %}>
                                 <label class="form-check-label" for="draftCheck">Keep as Draft (Hidden from public)</label>
                             </div>
                             <div class="d-flex justify-content-between">
-                                <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
-                                <button type="submit" class="btn btn-primary">Save Recipe</button>
+                                <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
                     </div>
@@ -45,7 +87,7 @@
     </div>
 
     <script>
-        let stepCount = 0;
+        let stepCount = {{ recipe.steps|length }};
         const allUnits = {{ all_units|tojson }};
         const allIngredients = {{ all_ingredients|tojson }};
 
@@ -57,17 +99,18 @@
             });
         }
 
-        function buildUnitsOptions(ingredientId) {
+        function buildUnitsOptions(ingredientId, selectedId) {
             const units = getUnitsForIngredient(ingredientId);
             let html = '<option value="">Select unit...</option>';
             units.forEach(unit => {
-                html += `<option value="${unit.id}">${unit.name} (${unit.unit_type})</option>`;
+                const selected = unit.id === selectedId ? 'selected' : '';
+                html += `<option value="${unit.id}" ${selected}>${unit.name} (${unit.unit_type})</option>`;
             });
             return html;
         }
 
         function addIngredient(stepNum) {
-            const container = stepNum === 0 ? document.getElementById('global-ingredients') : document.getElementById('step-' + stepNum + '-ingredients');
+            const container = document.getElementById('step-' + stepNum + '-ingredients');
             const row = document.createElement('div');
             row.className = 'row g-2 mb-2 ingredient-row';
             row.innerHTML = `
@@ -97,7 +140,7 @@
             const row = select.closest('.ingredient-row');
             const unitSelect = row.querySelector('.unit-select');
             const ingredientId = select.value;
-            unitSelect.innerHTML = buildUnitsOptions(ingredientId);
+            unitSelect.innerHTML = buildUnitsOptions(ingredientId, null);
         }
 
         function addStep() {

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>{{ recipe.title }} - Recipe Vault</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
 </head>
 <body class="bg-light">
     <div class="container mt-5">
@@ -20,58 +21,73 @@
                     <div class="card-body">
                         <h1>{{ recipe.title }}</h1>
                         <p class="lead text-muted">{{ recipe.description }}</p>
+                        {% if recipe.instructions %}
                         <hr>
-                        <h4>Instructions</h4>
+                        <h4>Notes</h4>
                         <p style="white-space: pre-wrap;">{{ recipe.instructions }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <h4 class="card-title">Ingredients</h4>
-                        {% if not recipe.recipe_ingredients %}
-                            <p class="text-muted">No ingredients added yet.</p>
-                        {% else %}
-                            <ul class="list-group list-group-flush">
-                                {% for ri in recipe.recipe_ingredients %}
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        {{ ri.ingredient.name }}
-                                        <span class="badge bg-primary rounded-pill">{{ ri.amount_grams }}{{ ri.display_unit }}</span>
-                                    </li>
-                                {% endfor %}
-                            </ul>
                         {% endif %}
                     </div>
                 </div>
 
-                {% if current_user.is_authenticated %}
+                {% if recipe.steps %}
+                {% for step in recipe.steps %}
+                <div class="card shadow mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Step {{ step.step_number }}</h5>
+                        <p style="white-space: pre-wrap;">{{ step.instruction }}</p>
+                        {% set step_ings = recipe.steps_dict.get(step.step_number, []) %}
+                        {% if step_ings %}
+                        <hr>
+                        <h6>Ingredients for this step:</h6>
+                        <ul class="list-group list-group-flush mb-2">
+                            {% for ri in step_ings %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ ri.ingredient.name }}
+                                <span class="badge bg-secondary rounded-pill">{{ ri.amount }} {{ ri.display_unit }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="col-md-4">
+                {% if recipe.aggregated_ingredients %}
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <h4 class="card-title">Ingredients</h4>
+                        <ul class="list-group list-group-flush">
+                            {% for agg in recipe.aggregated_ingredients %}
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a class="text-decoration-none text-dark" data-bs-toggle="collapse" href="#ing-{{ agg.ingredient.id }}" role="button" aria-expanded="false">
+                                        {{ agg.ingredient.name }}
+                                    </a>
+                                    <span class="badge bg-primary rounded-pill">{{ agg.total_amount }} {{ agg.display_unit }}</span>
+                                </div>
+                                {% if agg.steps|length > 0 %}
+                                <div class="collapse mt-2" id="ing-{{ agg.ingredient.id }}">
+                                    <small class="text-muted">
+                                        {% for step in agg.steps %}
+                                        <div>Step {{ step.step_number }}: {{ step.amount }} {{ step.display_unit }}</div>
+                                        {% endfor %}
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
                 <div class="card shadow">
                     <div class="card-body">
-                        <h5 class="card-title">Add Ingredient to Recipe</h5>
-                        <form action="{{ url_for('add_ingredient_to_recipe', recipe_id=recipe.id) }}" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label small">Select Ingredient</label>
-                                <select name="ingredient_id" class="form-select" required>
-                                    {% for ing in [] %} <!-- Need to pass ingredients list from route -->
-                                    {% endfor %}
-                                    <!-- Note: In a real app, you'd pass the list of all ingredients from the route -->
-                                </select>
-                            </div>
-                            <!-- Simplified logic: I will assume you pass 'all_ingredients' in the route -->
-                            <div class="row">
-                                <div class="col-6 mb-3">
-                                    <label class="form-label small">Amount (g)</label>
-                                    <input type="number" step="0.01" name="amount" class="form-control" required>
-                                </div>
-                                <div class="col-6 mb-3">
-                                    <label class="form-label small">Unit</label>
-                                    <input type="text" name="unit" class="form-control" placeholder="e.g. g, ml" required>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-outline-primary w-100">Add to Recipe</button>
-                        </form>
+                        <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary w-100">Edit Recipe</a>
                     </div>
                 </div>
                 {% endif %}
@@ -80,4 +96,3 @@
     </div>
 </body>
 </html>
-
