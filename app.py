@@ -21,6 +21,13 @@ app.config['WTF_CSRF_TIME_LIMIT'] = 3600
 app.config['JSON_SORT_KEYS'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
+@app.route("/lang/<lang_code>")
+def set_language(lang_code):
+    if lang_code in ('en', 'de', 'ru'):
+        session['lang'] = lang_code
+    referer = request.headers.get('Referer', url_for('home'))
+    return redirect(referer)
+
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
@@ -305,6 +312,206 @@ def add_security_headers(response):
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
+
+@app.before_request
+def handle_language():
+    lang = request.args.get('lang')
+    if lang and lang in ('en', 'de', 'ru'):
+        session['lang'] = lang
+    if 'lang' not in session:
+        session['lang'] = 'en'
+
+@app.context_processor
+def inject_translations():
+    translations_dict = {
+        'en': {
+            'home': 'Home', 'shelf': 'Shelf', 'cart': 'Cart', 'add_recipe': 'Add Recipe',
+            'add_ingredient': 'Add Ingredient', 'add_unit': 'Add Unit', 'login': 'Login',
+            'register': 'Register', 'logout': 'Logout', 'search': 'Search', 'all_recipes': 'All Recipes',
+            'shopping_list': 'Shopping List', 'my_shelf': 'My Shelf', 'download': 'Download Recipe',
+            'check_shelf': 'Check Shelf', 'add_missing': 'Add Missing to Cart', 'use_from_shelf': 'Use from Shelf',
+            'ingredients': 'Ingredients', 'instructions': 'Instructions', 'notes': 'Notes', 'portions': 'Portions',
+            'actions': 'Actions', 'tips': 'Tips', 'export': 'Export', 'copy_list': 'Copy List',
+            'discover_recipes': 'Discover Delicious Recipes', 'find_share': 'Find and share your favorite culinary creations',
+            'search_recipes': 'Search recipes...', 'search_results': 'Search Results', 'no_recipes': 'No recipes found',
+            'try_different': 'Try a different search term', 'create_first': 'Start by creating your first recipe!',
+            'view_recipe': 'View Recipe', 'edit_recipe': 'Edit Recipe', 'draft': 'Draft', 'no_description': 'No description',
+            'step': 'Step', 'ingredients_for_step': 'Ingredients for this step', 'convert_to': 'Convert to', 'original': 'original',
+            'on_shelf': '✓ On shelf', 'partial': '⚠ Partial', 'missing': '✗ Missing', 'have': 'have',
+            'shelf_check': 'Shelf Check', 'close': 'Close', 'save': 'Save', 'cancel': 'Cancel',
+            'delete': 'Delete', 'confirm_delete': 'Confirm Delete', 'item_added': 'Item added to shelf!',
+            'item_removed': 'Item removed', 'cart_empty': 'Cart is empty', 'add_to_cart': 'Add to cart',
+            'required': 'required', 'title_required': 'Title is required', 'amount_required': 'Amount required',
+            'ingredient_required': 'Ingredient and amount required', 'name_required': 'Name is required',
+            'invalid_amount': 'Invalid amount', 'positive_number': 'must be a positive number',
+            'username': 'Username', 'password': 'Password', 'login_failed': 'Login failed.',
+            'register_success': 'Registration successful', 'username_taken': 'Username taken',
+            'alphanumeric': 'Username must be alphanumeric', 'min_chars': 'Username must be 3-20 characters',
+            'min_password': 'Password must be at least 8 characters',
+            'title': 'Title', 'description': 'Description', 'is_draft': 'Save as draft',
+            'add_more_ingredients': 'Add More Ingredients', 'save_recipe': 'Save Recipe',
+            'update_recipe': 'Update Recipe', 'ingredient_name': 'Ingredient Name', 'density': 'Density',
+            'grams_per_unit': 'Grams per unit', 'unit_name': 'Unit Name', 'preferred_unit': 'Preferred Unit',
+            'comment': 'Comment', 'unit_type': 'Unit Type', 'mass': 'Mass', 'volume': 'Volume', 'count': 'Count',
+            'grams_conversion': 'Grams Conversion', 'bound_to_ingredient': 'Bind to specific ingredient',
+            'available_units': 'Available Units', 'add_item': 'Add Item', 'quantity': 'Quantity', 'best_before': 'Best Before',
+            'shopping_list_title': 'Shopping List', 'copy_to_clipboard': 'Copy to Clipboard',
+            'recipe_created': 'Recipe created!', 'recipe_updated': 'Recipe updated!',
+            'added_to_cart': 'Added to cart', 'used_from_shelf': 'Used from shelf', 'not_on_shelf': 'Not on shelf',
+            'all_available': 'All ingredients available on shelf!',
+            'print_recipe': 'Print Recipe', 'english': 'English', 'german': 'German', 'russian': 'Russian',
+        },
+        'de': {
+            'home': 'Startseite', 'shelf': 'Vorrat', 'cart': 'Einkaufswagen', 'add_recipe': 'Rezept hinzufügen',
+            'add_ingredient': 'Zutat hinzufügen', 'add_unit': 'Einheit hinzufügen', 'login': 'Anmelden',
+            'register': 'Registrieren', 'logout': 'Abmelden', 'search': 'Suchen', 'all_recipes': 'Alle Rezepte',
+            'shopping_list': 'Einkaufsliste', 'my_shelf': 'Mein Vorrat', 'download': 'Rezept herunterladen',
+            'check_shelf': 'Vorrat prüfen', 'add_missing': 'Fehlendes hinzufügen', 'use_from_shelf': 'Aus Vorrat nehmen',
+            'ingredients': 'Zutaten', 'instructions': 'Anleitung', 'notes': 'Notizen', 'portions': 'Portionen',
+            'actions': 'Aktionen', 'tips': 'Tipps', 'export': 'Exportieren', 'copy_list': 'Liste kopieren',
+            'discover_recipes': 'Entdecken Sie köstliche Rezepte', 'find_share': 'Teilen Sie Ihre Lieblingsgerichte',
+            'search_recipes': 'Rezepte suchen...', 'search_results': 'Suchergebnisse', 'no_recipes': 'Keine Rezepte gefunden',
+            'try_different': 'Versuchen Sie einen anderen Suchbegriff', 'create_first': 'Erstellen Sie Ihr erstes Rezept!',
+            'view_recipe': 'Rezept ansehen', 'edit_recipe': 'Rezept bearbeiten', 'draft': 'Entwurf', 'no_description': 'Keine Beschreibung',
+            'step': 'Schritt', 'ingredients_for_step': 'Zutaten für diesen Schritt', 'convert_to': 'Umrechnen zu', 'original': 'Original',
+            'on_shelf': '✓ Im Vorrat', 'partial': '⚠ Teilweise', 'missing': '✗ Fehlt', 'have': 'haben',
+            'shelf_check': 'Vorratsprüfung', 'close': 'Schließen', 'save': 'Speichern', 'cancel': 'Abbrechen',
+            'delete': 'Löschen', 'confirm_delete': 'Löschen bestätigen', 'item_added': 'Artikel zum Vorrat hinzugefügt!',
+            'item_removed': 'Artikel entfernt', 'cart_empty': 'Warenkorb ist leer', 'add_to_cart': 'In den Warenkorb',
+            'required': 'erforderlich', 'title_required': 'Titel ist erforderlich', 'amount_required': 'Menge erforderlich',
+            'ingredient_required': 'Zutat und Menge erforderlich', 'name_required': 'Name ist erforderlich',
+            'invalid_amount': 'Ungültige Menge', 'positive_number': 'muss eine positive Zahl sein',
+            'username': 'Benutzername', 'password': 'Passwort', 'login_failed': 'Anmeldung fehlgeschlagen.',
+            'register_success': 'Registrierung erfolgreich', 'username_taken': 'Benutzername bereits vergeben',
+            'alphanumeric': 'Benutzername muss alphanumerisch sein', 'min_chars': 'Benutzername muss 3-20 Zeichen haben',
+            'min_password': 'Passwort muss mindestens 8 Zeichen haben',
+            'title': 'Titel', 'description': 'Beschreibung', 'is_draft': 'Als Entwurf speichern',
+            'add_more_ingredients': 'Weitere Zutaten hinzufügen', 'save_recipe': 'Rezept speichern',
+            'update_recipe': 'Rezept aktualisieren', 'ingredient_name': 'Zutatenname', 'density': 'Dichte',
+            'grams_per_unit': 'Gramm pro Einheit', 'unit_name': 'Einheitsname', 'preferred_unit': 'Bevorzugte Einheit',
+            'comment': 'Kommentar', 'unit_type': 'Einheitstyp', 'mass': 'Masse', 'volume': 'Volumen', 'count': 'Stück',
+            'grams_conversion': 'Gramm-Umrechnung', 'bound_to_ingredient': 'An bestimmte Zutat binden',
+            'available_units': 'Verfügbare Einheiten', 'add_item': 'Artikel hinzufügen', 'quantity': 'Menge',
+            'best_before': 'Mindestens haltbar bis', 'shopping_list_title': 'Einkaufsliste',
+            'copy_to_clipboard': 'In Zwischenablage kopieren',
+            'recipe_created': 'Rezept erstellt!', 'recipe_updated': 'Rezept aktualisiert!',
+            'added_to_cart': 'Zum Warenkorb hinzugefügt', 'used_from_shelf': 'Vom Vorrat verwendet',
+            'not_on_shelf': 'Nicht im Vorrat', 'all_available': 'Alle Zutaten im Vorrat!',
+            'print_recipe': 'Rezept drucken', 'english': 'Englisch', 'german': 'Deutsch', 'russian': 'Russisch',
+        },
+        'ru': {
+            'home': 'Главная', 'shelf': 'Кладовая', 'cart': 'Корзина', 'add_recipe': 'Добавить рецепт',
+            'add_ingredient': 'Добавить ингредиент', 'add_unit': 'Добавить единицу', 'login': 'Войти',
+            'register': 'Регистрация', 'logout': 'Выйти', 'search': 'Поиск', 'all_recipes': 'Все рецепты',
+            'shopping_list': 'Список покупок', 'my_shelf': 'Моя кладовая', 'download': 'Скачать рецепт',
+            'check_shelf': 'Проверить кладовую', 'add_missing': 'Добавить недостающее', 'use_from_shelf': 'Взять с кладовой',
+            'ingredients': 'Ингредиенты', 'instructions': 'Инструкции', 'notes': 'Заметки', 'portions': 'Порции',
+            'actions': 'Действия', 'tips': 'Советы', 'export': 'Экспорт', 'copy_list': 'Копировать список',
+            'discover_recipes': 'Откройте для себя вкусные рецепты', 'find_share': 'Делитесь своими любимыми блюдами',
+            'search_recipes': 'Поиск рецептов...', 'search_results': 'Результаты поиска', 'no_recipes': 'Рецепты не найдены',
+            'try_different': 'Попробуйте другой поисковый запрос', 'create_first': 'Создайте свой первый рецепт!',
+            'view_recipe': 'Посмотреть рецепт', 'edit_recipe': 'Редактировать рецепт', 'draft': 'Черновик', 'no_description': 'Нет описания',
+            'step': 'Шаг', 'ingredients_for_step': 'Ингредиенты для этого шага', 'convert_to': 'Конвертировать в', 'original': 'оригинал',
+            'on_shelf': '✓ На полке', 'partial': '⚠ Частично', 'missing': '✗ Отсутствует', 'have': 'есть',
+            'shelf_check': 'Проверка кладовой', 'close': 'Закрыть', 'save': 'Сохранить', 'cancel': 'Отмена',
+            'delete': 'Удалить', 'confirm_delete': 'Подтвердить удаление', 'item_added': 'Добавлено на полку!',
+            'item_removed': 'Удалено', 'cart_empty': 'Корзина пуста', 'add_to_cart': 'В корзину',
+            'required': 'обязательно', 'title_required': 'Название обязательно', 'amount_required': 'Количество обязательно',
+            'ingredient_required': 'Ингредиент и количество обязательны', 'name_required': 'Имя обязательно',
+            'invalid_amount': 'Неверное количество', 'positive_number': 'должно быть положительным числом',
+            'username': 'Имя пользователя', 'password': 'Пароль', 'login_failed': 'Вход не выполнен.',
+            'register_success': 'Регистрация успешна', 'username_taken': 'Имя пользователя занято',
+            'alphanumeric': 'Имя пользователя должно быть буквенно-цифровым', 'min_chars': 'Имя пользователя должно быть 3-20 символов',
+            'min_password': 'Пароль должен содержать минимум 8 символов',
+            'title': 'Название', 'description': 'Описание', 'is_draft': 'Сохранить как черновик',
+            'add_more_ingredients': 'Добавить ингредиенты', 'save_recipe': 'Сохранить рецепт',
+            'update_recipe': 'Обновить рецепт', 'ingredient_name': 'Название ингредиента', 'density': 'Плотность',
+            'grams_per_unit': 'Грамм н�� единицу', 'unit_name': 'Название единицы', 'preferred_unit': 'Предпочитаемая единица',
+            'comment': 'Комментарий', 'unit_type': 'Тип единицы', 'mass': 'Масса', 'volume': 'Объём', 'count': 'Штука',
+            'grams_conversion': 'Конвертация в граммы', 'bound_to_ingredient': 'Связать с ингредиентом',
+            'available_units': 'Доступные единицы', 'add_item': 'Добавить', 'quantity': 'Количество',
+            'best_before': 'Годен до', 'shopping_list_title': 'Список покупок',
+            'copy_to_clipboard': 'Копировать в буфер',
+            'recipe_created': 'Рецепт создан!', 'recipe_updated': 'Рецепт обновлён!',
+            'added_to_cart': 'Добавлено в корзину', 'used_from_shelf': 'Взято с полки', 'not_on_shelf': 'Нет на полке',
+            'all_available': 'Все ингредиенты есть на полке!',
+            'print_recipe': 'Печать рецепта', 'english': 'Английский', 'german': 'Немецкий', 'russian': 'Русский',
+        }
+    }
+    
+    ingredient_translations = {
+        'Mehl (Type 405)': {'de': 'Mehl (Type 405)', 'ru': 'Мука (Тип 405)'},
+        'Backkakao': {'de': 'Backkakao', 'ru': 'Какао-порошок'},
+        'Zucker': {'de': 'Zucker', 'ru': 'Сахар'},
+        'Speiseöl': {'de': 'Speiseöl', 'ru': 'Растительное масло'},
+        'Backpulver': {'de': 'Backpulver', 'ru': 'Разрыхлитель'},
+        'Wasser': {'de': 'Wasser', 'ru': 'Вода'},
+        'Vanilleextrakt': {'de': 'Vanilleextrakt', 'ru': 'Ванильный экстракт'},
+        'Vanille': {'de': 'Vanille', 'ru': 'Ваниль'},
+        'Salz': {'de': 'Salz', 'ru': 'Соль'},
+        'Butter': {'de': 'Butter', 'ru': 'Масло сливочное'},
+        'Eier': {'de': 'Eier', 'ru': 'Яйца'},
+        'Eier (Größe M)': {'de': 'Eier (Größe M)', 'ru': 'Яйца (размер M)'},
+        'Milch': {'de': 'Milch', 'ru': 'Молоко'},
+        'Sahne': {'de': 'Sahne', 'ru': 'Сливки'},
+        'Schmand': {'de': 'Schmand', 'ru': 'Сметана'},
+        'Sauerrahm': {'de': 'Sauerrahm', 'ru': 'Сметана'},
+        'Hefe': {'de': 'Hefe', 'ru': 'Дрожжи'},
+        'Hühnchen': {'de': 'Hühnchen', 'ru': 'Курица'},
+        'Rindfleisch': {'de': 'Rindfleisch', 'ru': 'Говядина'},
+        'Schweinefleisch': {'de': 'Schweinefleisch', 'ru': 'Свинина'},
+        'Fisch': {'de': 'Fisch', 'ru': 'Рыба'},
+        'Lachs': {'de': 'Lachs', 'ru': 'Лосось'},
+        'Zwiebeln': {'de': 'Zwiebeln', 'ru': 'Лук репчатый'},
+        'Knoblauch': {'de': 'Knoblauch', 'ru': 'Чеснок'},
+        'Kartoffeln': {'de': 'Kartoffeln', 'ru': 'Картофель'},
+        'Tomaten': {'de': 'Tomaten', 'ru': 'Помидоры'},
+        'Paprika': {'de': 'Paprika', 'ru': 'Перец'},
+        'Gurken': {'de': 'Gurken', 'ru': 'Огурцы'},
+        'Blattsalat': {'de': 'Blattsalat', 'ru': 'Салат'},
+        'Spaghetti': {'de': 'Spaghetti', 'ru': 'Спагетти'},
+        'Reis': {'de': 'Reis', 'ru': 'Рис'},
+        'Nudeln': {'de': 'Nudeln', 'ru': 'Макароны'},
+    }
+    
+    unit_translations = {
+        'g': {'de': 'g', 'ru': 'г'},
+        'kg': {'de': 'kg', 'ru': 'кг'},
+        'mg': {'de': 'mg', 'ru': 'мг'},
+        'mL': {'de': 'mL', 'ru': 'мл'},
+        'L': {'de': 'L', 'ru': 'л'},
+        'EL': {'de': 'EL', 'ru': 'ст.л.'},
+        'TL': {'de': 'TL', 'ru': 'ч.л.'},
+        'cup': {'de': 'cup', 'ru': 'стакан'},
+        'cups': {'de': 'cups', 'ru': 'стаканов'},
+        'tsp': {'de': 'tsp', 'ru': 'ч.л.'},
+        'tbsp': {'de': 'tbsp', 'ru': 'ст.л.'},
+        'oz': {'de': 'oz', 'ru': 'унц'},
+        'lb': {'de': 'lb', 'ru': 'фунт'},
+        'pc': {'de': 'Stück', 'ru': 'шт'},
+        'pcs': {'de': 'Stück', 'ru': 'шт'},
+    }
+
+    current_lang = session.get('lang', 'en')
+    
+    def translate_content(text):
+        if not text:
+            return text
+        result = text
+        for orig, trans in ingredient_translations.items():
+            if current_lang in trans:
+                result = result.replace(orig, trans[current_lang])
+        for orig, trans in unit_translations.items():
+            if current_lang in trans and orig != current_lang:
+                result = result.replace(orig, trans[current_lang])
+        return result
+
+    return dict(
+        t=lambda key: translations_dict.get(current_lang, translations_dict['en']).get(key, key),
+        lang=current_lang,
+        languages=[('en', 'EN'), ('de', 'DE'), ('ru', 'RU')],
+        translate=translate_content
+    )
 
 # --- Routes ---
 
@@ -955,13 +1162,48 @@ def use_from_shelf(recipe_id):
     return redirect(url_for('recipe_detail', recipe_id=recipe_id))
 
 @app.route("/recipe/<int:recipe_id>/print")
-@login_required
 def print_recipe(recipe_id):
+    target_lang = request.args.get('lang', session.get('lang', 'en'))
     recipe = Recipe.query.get_or_404(recipe_id)
     
-    pdf_content = f"""# {recipe.title}
+    def translate(text):
+        if target_lang == 'en' or not text:
+            return text
+        
+        ingredient_translations = {
+            'Mehl (Type 405)': {'de': 'Mehl (Type 405)', 'ru': 'Мука (Тип 405)'},
+            'Backkakao': {'de': 'Backkakao', 'ru': 'Какао-порошок'},
+            'Zucker': {'de': 'Zucker', 'ru': 'Сахар'},
+            'Speiseöl': {'de': 'Speiseöl', 'ru': 'Растительное масло'},
+            'Backpulver': {'de': 'Backpulver', 'ru': 'Разрыхлитель'},
+            'Wasser': {'de': 'Wasser', 'ru': 'Вода'},
+            'Vanilleextrakt': {'de': 'Vanilleextrakt', 'ru': 'Ванильный экстракт'},
+            'Vanille': {'de': 'Vanille', 'ru': 'Ваниль'},
+        }
+        
+        for orig, trans in ingredient_translations.items():
+            if target_lang in trans:
+                text = text.replace(orig, trans[target_lang])
+        
+        if target_lang == 'ru':
+            text = text.replace('g', 'г').replace('ml', 'мл').replace('TL', 'ч.л.').replace('EL', 'ст.л.')
+            text = text.replace('Portions:', 'Порции:').replace('Ingredients', 'Ингредиенты')
+            text = text.replace('Instructions', 'Инструкции').replace('Notes', 'Заметки')
+            text = text.replace('Step', 'Шаг')
+        elif target_lang == 'de':
+            text = text.replace('Portions:', 'Portionen:').replace('Ingredients', 'Zutaten')
+            text = text.replace('Instructions', 'Anleitung').replace('Notes', 'Notizen')
+            text = text.replace('Step', 'Schritt')
+        
+        return text
+    
+    title = translate(recipe.title)
+    description = translate(recipe.description) if recipe.description else ''
+    instructions = translate(recipe.instructions) if recipe.instructions else ''
+    
+    pdf_content = f"""# {title}
 
-{recipe.description or ''}
+{description}
 
 **Portions:** {recipe.portions}
 
@@ -971,20 +1213,62 @@ def print_recipe(recipe_id):
 
 """
     for ri in recipe.recipe_ingredients:
+        ing_name = translate(ri.ingredient.name)
         amount_str = f"{ri.amount} {ri.unit.name}" if ri.unit else f"{ri.amount}g"
-        pdf_content += f"- {ri.ingredient.name}: {amount_str}\n"
+        pdf_content += f"- {ing_name}: {amount_str}\n"
     
     if recipe.steps:
         pdf_content += "\n## Instructions\n\n"
         for step in recipe.steps:
-            pdf_content += f"{step.step_number}. {step.instruction}\n\n"
+            instruction = translate(step.instruction)
+            pdf_content += f"{step.step_number}. {instruction}\n\n"
     
     if recipe.instructions:
-        pdf_content += f"\n{recipe.instructions}\n"
+        pdf_content += f"\n{instructions}\n"
     
+    filename = f"{title.replace(' ', '_')}.md"
     return pdf_content, 200, {
         'Content-Type': 'text/markdown; charset=utf-8',
-        'Content-Disposition': f'attachment; filename="{recipe.title}.md"'
+        'Content-Disposition': f'attachment; filename="{filename}"'
+    }
+
+@app.route("/api/translate/<int:recipe_id>")
+def translate_recipe(recipe_id):
+    target_lang = request.args.get('lang', session.get('lang', 'en'))
+    recipe = Recipe.query.get_or_404(recipe_id)
+    
+    ingredient_translations = {
+        'Mehl (Type 405)': {'de': 'Mehl (Type 405)', 'ru': 'Мука (Тип 405)'},
+        'Backkakao': {'de': 'Backkakao', 'ru': 'Какао-порошок'},
+        'Zucker': {'de': 'Zucker', 'ru': 'Сахар'},
+        'Speiseöl': {'de': 'Speiseöl', 'ru': 'Растительное масло'},
+        'Backpulver': {'de': 'Backpulver', 'ru': 'Разрыхлитель'},
+        'Wasser': {'de': 'Wasser', 'ru': 'Вода'},
+        'Vanilleextrakt': {'de': 'Vanilleextrakt', 'ru': 'Ванильный экстракт'},
+    }
+    
+    def translate_text(text):
+        if target_lang == 'en' or not text:
+            return text
+        
+        result = text
+        for orig, trans in ingredient_translations.items():
+            if target_lang in trans:
+                result = result.replace(orig, trans[target_lang])
+        
+        if target_lang == 'ru':
+            result = result.replace('g', 'г').replace('ml', 'мл').replace('TL', 'ч.л.').replace('EL', 'ст.л.')
+        return result
+    
+    return {
+        'title': translate_text(recipe.title),
+        'description': translate_text(recipe.description) if recipe.description else None,
+        'instructions': translate_text(recipe.instructions) if recipe.instructions else None,
+        'ingredients': [
+            {'name': translate_text(ri.ingredient.name), 'amount': ri.amount, 'unit': ri.unit.name if ri.unit else 'g'}
+            for ri in recipe.recipe_ingredients
+        ],
+        'steps': [{'number': s.step_number, 'instruction': translate_text(s.instruction)} for s in recipe.steps]
     }
 
 if __name__ == '__main__':

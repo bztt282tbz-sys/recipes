@@ -126,17 +126,20 @@
     <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
-            <div>
+            <div class="d-flex align-items-center">
+                {% for l, label in languages %}
+                <a href="{{ url_for('set_language', lang_code=l) }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
+                {% endfor %}
                 {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('shelf') }}" class="btn btn-outline-light btn-sm">Shelf</a>
-                    <a href="{{ url_for('shopping_cart') }}" class="btn btn-outline-light btn-sm">Cart</a>
-                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">Add Recipe</a>
-                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">Add Ingredient</a>
-                    <a href="{{ url_for('add_unit') }}" class="btn btn-outline-light btn-sm">Add Unit</a>
-                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">Logout</a>
+                    <a href="{{ url_for('shelf') }}" class="btn btn-outline-light btn-sm">{{ t('shelf') }}</a>
+                    <a href="{{ url_for('shopping_cart') }}" class="btn btn-outline-light btn-sm">{{ t('cart') }}</a>
+                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">{{ t('add_recipe') }}</a>
+                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">{{ t('add_ingredient') }}</a>
+                    <a href="{{ url_for('add_unit') }}" class="btn btn-outline-light btn-sm">{{ t('add_unit') }}</a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">{{ t('logout') }}</a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">Login</a>
-                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">Register</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">{{ t('login') }}</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">{{ t('register') }}</a>
                 {% endif %}
             </div>
         </div>
@@ -152,20 +155,20 @@
         {% endwith %}
 
         <div class="hero-section text-center">
-            <h1 class="hero-title">Discover Delicious Recipes</h1>
-            <p class="hero-subtitle">Find and share your favorite culinary creations</p>
+            <h1 class="hero-title">{{ t('discover_recipes') }}</h1>
+            <p class="hero-subtitle">{{ t('find_share') }}</p>
             
             <form action="{{ url_for('home') }}" method="get" class="search-form">
                 <div class="input-group">
-                    <input type="text" name="q" class="form-control search-input" placeholder="Search recipes..." value="{{ search_query }}">
-                    <button type="submit" class="btn btn-primary search-btn">Search</button>
+                    <input type="text" name="q" class="form-control search-input" placeholder="{{ t('search_recipes') }}" value="{{ search_query }}">
+                    <button type="submit" class="btn btn-primary search-btn">{{ t('search') }}</button>
                 </div>
             </form>
         </div>
 
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 class="mb-0" style="font-family: 'Playfair Display', serif; color: #2c3e50;">
-                {% if search_query %}Search Results{% else %}All Recipes{% endif %}
+                {% if search_query %}{{ t('search_results') }}{% else %}{{ t('all_recipes') }}{% endif %}
             </h4>
             <span class="text-muted">{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }}</span>
         </div>
@@ -175,8 +178,8 @@
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                <h5>No recipes found</h5>
-                <p>{% if search_query %}Try a different search term{% else %}Start by creating your first recipe!{% endif %}</p>
+                <h5>{{ t('no_recipes') }}</h5>
+                <p>{% if search_query %}{{ t('try_different') }}{% else %}{{ t('create_first') }}{% endif %}</p>
             </div>
         {% endif %}
 
@@ -185,23 +188,24 @@
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100 recipe-card shadow-sm">
                         <div class="card-body">
-                            <h5 class="card-title">{{ recipe.title }}</h5>
-                            <p class="card-text">{{ recipe.description[:120] if recipe.description else 'No description' }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
-                            <div class="recipe-meta">
+                            <h5 class="card-title">{{ translate(recipe.title) }}</h5>
+{% set desc = translate(recipe.description)[:120] if recipe.description else t('no_description') %}
+                             <p class="card-text">{{ desc }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
+                             <div class="recipe-meta">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
                                 </svg>
                                 <span>{{ recipe.author.username }}</span>
                                 {% if recipe.is_draft and current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                                    <span class="badge badge-draft ms-2">Draft</span>
+                                    <span class="badge badge-draft ms-2">{{ t('draft') }}</span>
                                 {% endif %}
                             </div>
                         </div>
                         <div class="card-footer bg-transparent border-top-0">
                             {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                            <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">Edit</a>
+                            <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
                             {% endif %}
-                            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">View Recipe</a>
+                            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
                         </div>
                     </div>
                 </div>
