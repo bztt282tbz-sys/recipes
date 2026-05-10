@@ -1,218 +1,151 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Recipe Vault</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Source Sans 3', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
-            min-height: 100vh;
-        }
-        .navbar {
-            background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%) !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .navbar-brand {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .hero-section {
-            background: white;
-            border-radius: 16px;
-            padding: 3rem 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-        }
-        .hero-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-        }
-        .hero-subtitle {
-            color: #7f8c8d;
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
-        }
-        .search-form {
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        .search-input {
-            border: 2px solid #e0e0e0;
-            border-radius: 50px;
-            padding: 12px 24px;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-        .search-input:focus {
-            border-color: #3498db;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
-            outline: none;
-        }
-        .search-btn {
-            border-radius: 50px;
-            padding: 10px 30px;
-        }
-        .recipe-card {
-            border: none;
-            border-radius: 12px;
-            transition: all 0.3s;
-            overflow: hidden;
-        }
-        .recipe-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.1) !important;
-        }
-        .recipe-card .card-body {
-            padding: 1.5rem;
-        }
-        .recipe-card .card-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.25rem;
-            color: #2c3e50;
-            margin-bottom: 0.75rem;
-        }
-        .recipe-card .card-text {
-            color: #7f8c8d;
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-        .recipe-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            color: #95a5a6;
-        }
-        .badge-draft {
-            background: #f39c12;
-            color: white;
-        }
-        .btn-view {
-            background: #3498db;
-            border: none;
-            border-radius: 20px;
-            padding: 8px 20px;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-        .btn-view:hover {
-            background: #2980b9;
-            color: white;
-        }
-        .btn-edit {
-            border-radius: 20px;
-            padding: 8px 20px;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: #7f8c8d;
-        }
-        .empty-state svg {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
-            <div class="d-flex align-items-center">
-                {% for l, label in languages %}
-                <a href="{{ url_for('set_language', lang_code=l) }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
-                {% endfor %}
-                {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('shelf') }}" class="btn btn-outline-light btn-sm">{{ t('shelf') }}</a>
-                    <a href="{{ url_for('shopping_cart') }}" class="btn btn-outline-light btn-sm">{{ t('cart') }}</a>
-                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">{{ t('add_recipe') }}</a>
-                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">{{ t('add_ingredient') }}</a>
-                    <a href="{{ url_for('add_unit') }}" class="btn btn-outline-light btn-sm">{{ t('add_unit') }}</a>
-                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">{{ t('logout') }}</a>
-                {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">{{ t('login') }}</a>
-                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">{{ t('register') }}</a>
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: white;
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    .hero-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    .hero-subtitle {
+        color: #7f8c8d;
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+    }
+    .search-form { max-width: 500px; margin: 0 auto; }
+    .search-input {
+        border: 2px solid #e0e0e0;
+        border-radius: 50px;
+        padding: 12px 24px;
+        font-size: 1rem;
+        transition: all 0.3s;
+    }
+    .search-input:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52,152,219,0.1);
+        outline: none;
+    }
+    .search-btn { border-radius: 50px; padding: 10px 30px; }
+    .recipe-card {
+        border: none;
+        border-radius: 12px;
+        transition: all 0.3s;
+        overflow: hidden;
+    }
+    .recipe-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.1) !important;
+    }
+    .recipe-card .card-body { padding: 1.5rem; }
+    .recipe-card .card-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.25rem;
+        color: #2c3e50;
+        margin-bottom: 0.75rem;
+    }
+    .recipe-card .card-text {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    .recipe-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #95a5a6;
+    }
+    .badge-draft { background: #f39c12; color: white; }
+    .btn-view {
+        background: #3498db;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 20px;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+    .btn-view:hover { background: #2980b9; color: white; }
+    .btn-edit { border-radius: 20px; padding: 8px 20px; }
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #7f8c8d;
+    }
+    .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero-section text-center">
+    <h1 class="hero-title">{{ t('discover_recipes') }}</h1>
+    <p class="hero-subtitle">{{ t('find_share') }}</p>
+    
+    <form action="{{ url_for('home') }}" method="get" class="search-form">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control search-input" placeholder="{{ t('search_recipes') }}" value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary search-btn">{{ t('search') }}</button>
+        </div>
+    </form>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0" style="font-family: 'Playfair Display', serif; color: #2c3e50;">
+        {% if search_query %}{{ t('search_results') }}{% else %}{{ t('all_recipes') }}{% endif %}
+    </h4>
+    <span class="text-muted">{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }}</span>
+</div>
+
+{% if not recipes %}
+<div class="empty-state">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+    <h5>{{ t('no_recipes') }}</h5>
+    <p>{% if search_query %}{{ t('try_different') }}{% else %}{{ t('create_first') }}{% endif %}</p>
+</div>
+{% endif %}
+
+<div class="row">
+    {% for recipe in recipes %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 recipe-card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">{{ recipe.get_title() }}</h5>
+                <p class="card-text">{{ recipe.get_description()[:120] if recipe.get_description() else t('no_description') }}{% if recipe.get_description() and recipe.get_description()|length > 120 %}...{% endif %}</p>
+                <div class="recipe-meta">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                    </svg>
+                    <span>{{ recipe.author.username }}</span>
+                    {% if recipe.language_list|length > 1 %}
+                        <span class="badge bg-info ms-1 lang-badge">{{ recipe.language_list|join(',')|upper }}</span>
+                    {% endif %}
+                    {% if recipe.is_draft and current_user.is_authenticated and recipe.creator_id == current_user.id %}
+                        <span class="badge badge-draft ms-2">{{ t('draft') }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
+                <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
                 {% endif %}
+                <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
             </div>
-        </div>
-    </nav>
-
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="hero-section text-center">
-            <h1 class="hero-title">{{ t('discover_recipes') }}</h1>
-            <p class="hero-subtitle">{{ t('find_share') }}</p>
-            
-            <form action="{{ url_for('home') }}" method="get" class="search-form">
-                <div class="input-group">
-                    <input type="text" name="q" class="form-control search-input" placeholder="{{ t('search_recipes') }}" value="{{ search_query }}">
-                    <button type="submit" class="btn btn-primary search-btn">{{ t('search') }}</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="mb-0" style="font-family: 'Playfair Display', serif; color: #2c3e50;">
-                {% if search_query %}{{ t('search_results') }}{% else %}{{ t('all_recipes') }}{% endif %}
-            </h4>
-            <span class="text-muted">{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }}</span>
-        </div>
-        
-        {% if not recipes %}
-            <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-                <h5>{{ t('no_recipes') }}</h5>
-                <p>{% if search_query %}{{ t('try_different') }}{% else %}{{ t('create_first') }}{% endif %}</p>
-            </div>
-        {% endif %}
-
-        <div class="row">
-            {% for recipe in recipes %}
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 recipe-card shadow-sm">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ translate(recipe.title) }}</h5>
-{% set desc = translate(recipe.description)[:120] if recipe.description else t('no_description') %}
-                             <p class="card-text">{{ desc }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
-                             <div class="recipe-meta">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
-                                </svg>
-                                <span>{{ recipe.author.username }}</span>
-                                {% if recipe.is_draft and current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                                    <span class="badge badge-draft ms-2">{{ t('draft') }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent border-top-0">
-                            {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                            <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
-                            {% endif %}
-                            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
         </div>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    {% endfor %}
+</div>
+{% endblock %}

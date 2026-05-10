@@ -25,8 +25,10 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 def set_language(lang_code):
     if lang_code in ('en', 'de', 'ru'):
         session['lang'] = lang_code
-    referer = request.headers.get('Referer', url_for('home'))
-    return redirect(referer)
+    back_to = request.args.get('back_to')
+    if back_to:
+        return redirect(back_to)
+    return redirect(request.headers.get('Referer', url_for('home')))
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -143,9 +145,35 @@ class Recipe(db.Model):
     instructions = db.Column(db.Text, nullable=True)
     is_draft = db.Column(db.Boolean, default=True)
     portions = db.Column(db.Float, default=1)
+    languages = db.Column(db.String(50), default='en')
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipe_ingredients = db.relationship('RecipeIngredient', backref='recipe', cascade="all, delete-orphan", lazy=True)
     steps = db.relationship('RecipeStep', backref='recipe', cascade="all, delete-orphan", lazy=True, order_by='RecipeStep.step_number')
+    translations = db.relationship('RecipeTranslation', backref='recipe', cascade="all, delete-orphan", lazy=True)
+
+    @property
+    def language_list(self):
+        return self.languages.split(',') if self.languages else ['en']
+    
+    def get_title(self, preferred_lang=None):
+        if preferred_lang is None:
+            preferred_lang = session.get('lang', 'en')
+        langs = self.language_list
+        if preferred_lang != 'en' and preferred_lang in langs:
+            trans = RecipeTranslation.query.filter_by(recipe_id=self.id, language=preferred_lang).first()
+            if trans:
+                return trans.title
+        return self.title
+    
+    def get_description(self, preferred_lang=None):
+        if preferred_lang is None:
+            preferred_lang = session.get('lang', 'en')
+        langs = self.language_list
+        if preferred_lang != 'en' and preferred_lang in langs:
+            trans = RecipeTranslation.query.filter_by(recipe_id=self.id, language=preferred_lang).first()
+            if trans and trans.description:
+                return trans.description
+        return self.description
 
     @property
     def total_weight_grams(self):
@@ -237,6 +265,25 @@ class RecipeStep(db.Model):
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
     step_number = db.Column(db.Integer, nullable=False)
     instruction = db.Column(db.Text, nullable=False)
+
+class RecipeTranslation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
+    language = db.Column(db.String(10), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    instructions = db.Column(db.Text, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint('recipe_id', 'language'),)
+
+class RecipeStepTranslation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
+    step_number = db.Column(db.Integer, nullable=False)
+    language = db.Column(db.String(10), nullable=False)
+    instruction = db.Column(db.Text, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint('recipe_id', 'step_number', 'language'),)
 
 class ShelfItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -436,8 +483,8 @@ def inject_translations():
             'added_to_cart': 'Добавлено в корзину', 'used_from_shelf': 'Взято с полки', 'not_on_shelf': 'Нет на полке',
             'all_available': 'Все ингредиенты есть на полке!',
             'print_recipe': 'Печать рецепта', 'english': 'Английский', 'german': 'Немецкий', 'russian': 'Русский',
-        }
-    }
+}
+}
     
     ingredient_translations = {
         'Mehl (Type 405)': {'de': 'Mehl (Type 405)', 'ru': 'Мука (Тип 405)'},
@@ -451,47 +498,31 @@ def inject_translations():
         'Salz': {'de': 'Salz', 'ru': 'Соль'},
         'Butter': {'de': 'Butter', 'ru': 'Масло сливочное'},
         'Eier': {'de': 'Eier', 'ru': 'Яйца'},
-        'Eier (Größe M)': {'de': 'Eier (Größe M)', 'ru': 'Яйца (размер M)'},
         'Milch': {'de': 'Milch', 'ru': 'Молоко'},
         'Sahne': {'de': 'Sahne', 'ru': 'Сливки'},
-        'Schmand': {'de': 'Schmand', 'ru': 'Сметана'},
-        'Sauerrahm': {'de': 'Sauerrahm', 'ru': 'Сметана'},
-        'Hefe': {'de': 'Hefe', 'ru': 'Дрожжи'},
-        'Hühnchen': {'de': 'Hühnchen', 'ru': 'Курица'},
-        'Rindfleisch': {'de': 'Rindfleisch', 'ru': 'Говядина'},
-        'Schweinefleisch': {'de': 'Schweinefleisch', 'ru': 'Свинина'},
-        'Fisch': {'de': 'Fisch', 'ru': 'Рыба'},
-        'Lachs': {'de': 'Lachs', 'ru': 'Лосось'},
-        'Zwiebeln': {'de': 'Zwiebeln', 'ru': 'Лук репчатый'},
-        'Knoblauch': {'de': 'Knoblauch', 'ru': 'Чеснок'},
-        'Kartoffeln': {'de': 'Kartoffeln', 'ru': 'Картофель'},
-        'Tomaten': {'de': 'Tomaten', 'ru': 'Помидоры'},
-        'Paprika': {'de': 'Paprika', 'ru': 'Перец'},
-        'Gurken': {'de': 'Gurken', 'ru': 'Огурцы'},
-        'Blattsalat': {'de': 'Blattsalat', 'ru': 'Салат'},
-        'Spaghetti': {'de': 'Spaghetti', 'ru': 'Спагетти'},
-        'Reis': {'de': 'Reis', 'ru': 'Рис'},
-        'Nudeln': {'de': 'Nudeln', 'ru': 'Макароны'},
     }
     
     unit_translations = {
         'g': {'de': 'g', 'ru': 'г'},
         'kg': {'de': 'kg', 'ru': 'кг'},
-        'mg': {'de': 'mg', 'ru': 'мг'},
         'mL': {'de': 'mL', 'ru': 'мл'},
         'L': {'de': 'L', 'ru': 'л'},
         'EL': {'de': 'EL', 'ru': 'ст.л.'},
         'TL': {'de': 'TL', 'ru': 'ч.л.'},
-        'cup': {'de': 'cup', 'ru': 'стакан'},
-        'cups': {'de': 'cups', 'ru': 'стаканов'},
-        'tsp': {'de': 'tsp', 'ru': 'ч.л.'},
-        'tbsp': {'de': 'tbsp', 'ru': 'ст.л.'},
-        'oz': {'de': 'oz', 'ru': 'унц'},
-        'lb': {'de': 'lb', 'ru': 'фунт'},
-        'pc': {'de': 'Stück', 'ru': 'шт'},
-        'pcs': {'de': 'Stück', 'ru': 'шт'},
     }
 
+    def auto_translate_text(text, target_lang):
+        if not text or target_lang == 'en':
+            return text
+        result = text
+        for orig, trans in ingredient_translations.items():
+            if target_lang in trans:
+                result = result.replace(orig, trans[target_lang])
+        for orig, trans in unit_translations.items():
+            if target_lang in trans and orig != target_lang and orig not in result:
+                result = result.replace(orig, trans[target_lang])
+        return result
+    
     current_lang = session.get('lang', 'en')
     
     def translate_content(text):
@@ -510,7 +541,8 @@ def inject_translations():
         t=lambda key: translations_dict.get(current_lang, translations_dict['en']).get(key, key),
         lang=current_lang,
         languages=[('en', 'EN'), ('de', 'DE'), ('ru', 'RU')],
-        translate=translate_content
+        translate=translate_content,
+        request=request
     )
 
 # --- Routes ---
@@ -537,9 +569,25 @@ def recipe_detail(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
     if recipe.is_draft and (not current_user.is_authenticated or recipe.creator_id != current_user.id):
         abort(404)
-    return render_template('recipe_detail.html', recipe=recipe)
-    recipe = Recipe.query.get_or_404(recipe_id)
-    return render_template('recipe_detail.html', recipe=recipe)
+    
+    view_lang = request.args.get('lang')
+    if not view_lang:
+        view_lang = session.get('lang', 'en')
+    
+    langs = recipe.language_list
+    
+    if view_lang != 'en' and view_lang not in langs:
+        view_lang = 'en'
+    
+    trans = None
+    step_trans = {}
+    if view_lang != 'en':
+        trans = RecipeTranslation.query.filter_by(recipe_id=recipe.id, language=view_lang).first()
+        if trans:
+            for st in RecipeStepTranslation.query.filter_by(recipe_id=recipe.id, language=view_lang).all():
+                step_trans[st.step_number] = st.instruction
+    
+    return render_template('recipe_detail.html', recipe=recipe, trans=trans, step_trans=step_trans, view_lang=view_lang)
 
 @app.route("/recipe/new", methods=['GET', 'POST'])
 @login_required
@@ -574,6 +622,7 @@ def add_recipe():
             instructions=instructions,
             is_draft=is_draft,
             portions=portions,
+            languages='en',
             creator_id=current_user.id
         )
         db.session.add(new_recipe)
@@ -1232,6 +1281,109 @@ def print_recipe(recipe_id):
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
 
+@app.route("/recipe/<int:recipe_id>/translate", methods=['GET', 'POST'])
+@login_required
+def manage_translation(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id:
+        flash('You cannot translate this recipe.', 'danger')
+        return redirect(url_for('home'))
+    
+    target_lang = request.args.get('lang', 'de')
+    if target_lang not in ('de', 'ru'):
+        target_lang = 'de'
+    
+    existing = RecipeTranslation.query.filter_by(recipe_id=recipe.id, language=target_lang).first()
+    existing_steps = {}
+    if existing:
+        for st in RecipeStepTranslation.query.filter_by(recipe_id=recipe.id, language=target_lang).all():
+            existing_steps[st.step_number] = st.instruction
+    else:
+        existing_steps = {s.step_number: auto_translate_text(s.instruction, target_lang) for s in recipe.steps}
+    
+    if not existing:
+        auto_title = auto_translate_text(recipe.title, target_lang) if target_lang != 'en' else ''
+        auto_desc = auto_translate_text(recipe.description, target_lang) if recipe.description else ''
+        auto_instructions = auto_translate_text(recipe.instructions, target_lang) if recipe.instructions else ''
+        
+        if auto_title != '' and auto_title != recipe.title:
+            existing = type('RecipeTranslation', (), {'title': auto_title, 'description': auto_desc, 'instructions': auto_instructions})()
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        instructions = request.form.get('instructions', '').strip()
+        
+        if not title:
+            flash('Title is required', 'danger')
+            return render_template('translate_recipe.html', recipe=recipe, target_lang=target_lang, existing=existing, existing_steps=existing_steps)
+        
+        if existing:
+            existing.title = title
+            existing.description = description
+            existing.instructions = instructions
+        else:
+            new_trans = RecipeTranslation(
+                recipe_id=recipe.id,
+                language=target_lang,
+                title=title,
+                description=description,
+                instructions=instructions
+            )
+            db.session.add(new_trans)
+            
+            langs = recipe.language_list
+            if target_lang not in langs:
+                langs.append(target_lang)
+                recipe.languages = ','.join(langs)
+        
+        RecipeStepTranslation.query.filter_by(recipe_id=recipe.id, language=target_lang).delete()
+        
+        step_instructions = request.form.getlist('step_instruction[]')
+        for i, instr in enumerate(step_instructions):
+            if instr and instr.strip():
+                step_trans = RecipeStepTranslation(
+                    recipe_id=recipe.id,
+                    step_number=i + 1,
+                    language=target_lang,
+                    instruction=instr.strip()
+                )
+                db.session.add(step_trans)
+        
+        try:
+            db.session.commit()
+            flash(f'Translation {target_lang.upper()} saved!', 'success')
+            return redirect(url_for('recipe_detail', recipe_id=recipe.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving translation: {str(e)}', 'danger')
+    
+    return render_template('translate_recipe.html', recipe=recipe, target_lang=target_lang, existing=existing, existing_steps=existing_steps)
+
+@app.route("/recipe/<int:recipe_id>/delete_translation/<lang_code>")
+@login_required
+def delete_translation(recipe_id, lang_code):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id:
+        flash('You cannot delete this translation.', 'danger')
+        return redirect(url_for('home'))
+    
+    if lang_code == 'en':
+        flash('Cannot delete original language', 'danger')
+        return redirect(url_for('recipe_detail', recipe_id=recipe.id))
+    
+    RecipeTranslation.query.filter_by(recipe_id=recipe.id, language=lang_code).delete()
+    RecipeStepTranslation.query.filter_by(recipe_id=recipe.id, language=lang_code).delete()
+    
+    langs = recipe.language_list
+    if lang_code in langs:
+        langs.remove(lang_code)
+        recipe.languages = ','.join(langs)
+    
+    db.session.commit()
+    flash(f'Translation {lang_code.upper()} deleted', 'success')
+    return redirect(url_for('recipe_detail', recipe_id=recipe.id))
+
 @app.route("/api/translate/<int:recipe_id>")
 def translate_recipe(recipe_id):
     target_lang = request.args.get('lang', session.get('lang', 'en'))
@@ -1410,6 +1562,59 @@ if __name__ == '__main__':
             
             step2 = RecipeStep(recipe_id=recipe.id, step_number=2, instruction='Mischung mit den restlichen Zutaten zusammengeben und alles gut miteinander verrühren. Teig in die Springform geben. Kuchen im vorgeheizten Ofen ca. 35 Min. backen. Mit einem Holzstäbchen prüfen, ob der Kuchen durchgebacken ist. Kuchen vollständig auskühlen lassen.')
             db.session.add(step2)
+            
+            recipe.languages = 'en,de,ru'
+            db.session.flush()
+            
+            trans_en = RecipeTranslation(
+                recipe_id=recipe.id,
+                language='en',
+                title='Chocolate Cake',
+                description='A moist chocolate cake with cocoa powder, baked in a springform pan (Ø 20 cm).',
+                instructions='Dust the cake with powdered sugar after it has cooled completely.'
+            )
+            db.session.add(trans_en)
+            
+            step1_en = RecipeStepTranslation(
+                recipe_id=recipe.id,
+                step_number=1,
+                language='en',
+                instruction='Preheat oven to 180°C (350°F) top/bottom heat (convection: 160°C/320°F). Grease a springform pan (Ø 20 cm) with a little oil. Mix flour with baking powder and cocoa powder.'
+            )
+            db.session.add(step1_en)
+            
+            step2_en = RecipeStepTranslation(
+                recipe_id=recipe.id,
+                step_number=2,
+                language='en',
+                instruction='Combine with the remaining ingredients and mix well. Pour batter into the springform pan. Bake in preheated oven for about 35 minutes. Test with a wooden skewer to see if done. Let cool completely.'
+            )
+            db.session.add(step2_en)
+            
+            trans_ru = RecipeTranslation(
+                recipe_id=recipe.id,
+                language='ru',
+                title='Шоколадный торт',
+                description='Влажный шоколадный торт с какао-порошком, испечённый в форме (Ø 20 см).',
+                instructions='Посыпьте торт сахарной пудрой после полного остывания.'
+            )
+            db.session.add(trans_ru)
+            
+            step1_ru = RecipeStepTranslation(
+                recipe_id=recipe.id,
+                step_number=1,
+                language='ru',
+                instruction='Разогрейте духовку до 180°C (конвекция: 160°C). Смажьте форму маслом. Смешайте муку с разрыхлителем и какао-порошком.'
+            )
+            db.session.add(step1_ru)
+            
+            step2_ru = RecipeStepTranslation(
+                recipe_id=recipe.id,
+                step_number=2,
+                language='ru',
+                instruction='Смешайте с остальными ингредиентами и хорошо перемешайте. Вылейте тесто в форму. Выпекайте в духовке около 35 минут. Проверьте деревянной шпажкой. Дать полностью остыть.'
+            )
+            db.session.add(step2_ru)
             
             db.session.commit()
         

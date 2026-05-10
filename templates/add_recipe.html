@@ -1,140 +1,129 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ t('add_recipe') }} - Recipe Vault</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-10">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h3 class="mb-4">{{ t('add_recipe') }}</h3>
-                        <form method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <div class="mb-3">
-                                <label class="form-label">{{ t('title') }}</label>
-                                <input type="text" name="title" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">{{ t('description') }}</label>
-                                <textarea name="description" class="form-control" rows="2"></textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">{{ t('portions') }}</label>
-                                <input type="number" name="portions" class="form-control" value="4" min="0.5" step="0.5">
-                            </div>
+{% extends "base.html" %}
 
-                            <hr>
-                            <h5>{{ t('instructions') }}</h5>
-                            <p class="text-muted small">{{ t('tips') }}</p>
-                            <div id="steps-container">
-                            </div>
-                            <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="addStep()">+ {{ t('add_item') }}</button>
+{% block title %}{{ t('add_recipe') }} - Recipe Vault{% endblock %}
 
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck">
-                                <label class="form-check-label" for="draftCheck">{{ t('is_draft') }}</label>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <a href="{{ url_for('home') }}" class="btn btn-secondary">{{ t('cancel') }}</a>
-                                <button type="submit" class="btn btn-primary">{{ t('save_recipe') }}</button>
-                            </div>
-                        </form>
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="mb-4">{{ t('add_recipe') }}</h3>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('title') }}</label>
+                        <input type="text" name="title" class="form-control" required>
                     </div>
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('description') }}</label>
+                        <textarea name="description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ t('portions') }}</label>
+                        <input type="number" name="portions" class="form-control" value="4" min="0.5" step="0.5">
+                    </div>
+
+                    <hr>
+                    <h5>{{ t('instructions') }}</h5>
+                    <div id="steps-container"></div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="addStep()">+ {{ t('add_item') }}</button>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck">
+                        <label class="form-check-label" for="draftCheck">{{ t('is_draft') }}</label>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('home') }}" class="btn btn-secondary">{{ t('cancel') }}</a>
+                        <button type="submit" class="btn btn-primary">{{ t('save_recipe') }}</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        let stepCount = 0;
-        const allUnits = {{ all_units|tojson }};
-        const allIngredients = {{ all_ingredients|tojson }};
+{% block extra_js %}
+<script>
+let stepCount = 0;
+const allUnits = {{ all_units|tojson }};
+const allIngredients = {{ all_ingredients|tojson }};
 
-        function getUnitsForIngredient(ingredientId) {
-            if (!ingredientId) return allUnits;
-            return allUnits.filter(unit => {
-                if (!unit.is_bound) return true;
-                return unit.ingredients && unit.ingredients.includes(parseInt(ingredientId));
-            });
-        }
+function getUnitsForIngredient(ingredientId) {
+    if (!ingredientId) return allUnits;
+    return allUnits.filter(unit => {
+        if (!unit.is_bound) return true;
+        return unit.ingredients && unit.ingredients.includes(parseInt(ingredientId));
+    });
+}
 
-        function buildUnitsOptions(ingredientId, preferredUnitId) {
-            const units = getUnitsForIngredient(ingredientId);
-            let html = '<option value="">{{ t("unit_type") }}...</option>';
-            units.forEach(unit => {
-                const selected = unit.id === preferredUnitId ? ' selected' : '';
-                html += `<option value="${unit.id}"${selected}>${unit.name} (${unit.unit_type})</option>`;
-            });
-            return html;
-        }
+function buildUnitsOptions(ingredientId, preferredUnitId) {
+    const units = getUnitsForIngredient(ingredientId);
+    let html = '<option value="">{{ t("unit_type") }}...</option>';
+    units.forEach(unit => {
+        const selected = unit.id === preferredUnitId ? ' selected' : '';
+        html += `<option value="${unit.id}"${selected}>${unit.name}</option>`;
+    });
+    return html;
+}
 
-        function addIngredient(stepNum) {
-            const container = stepNum === 0 ? document.getElementById('global-ingredients') : document.getElementById('step-' + stepNum + '-ingredients');
-            const row = document.createElement('div');
-            row.className = 'row g-2 mb-2 ingredient-row';
-            row.innerHTML = `
-                <div class="col-md-5">
-                    <select name="ing_id[]" class="form-select ingredient-select" onchange="updateUnitDropdown(this)">
-                        <option value="">{{ t("ingredients") }}...</option>
-                        ${allIngredients.map(ing => `<option value="${ing.id}">${ing.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input type="number" step="0.01" name="amount[]" class="form-control" placeholder="{{ t("quantity") }}">
-                </div>
-                <div class="col-md-2">
-                    <select name="unit_id[]" class="form-select unit-select">
-                        <option value="">{{ t("unit_type") }}...</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input type="hidden" name="step_num[]" value="${stepNum}">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
-                </div>
-            `;
-            container.appendChild(row);
-        }
+function addIngredient(stepNum) {
+    const container = stepNum === 0 ? document.getElementById('global-ingredients') : document.getElementById('step-' + stepNum + '-ingredients');
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 ingredient-row';
+    row.innerHTML = `
+        <div class="col-md-5">
+            <select name="ing_id[]" class="form-select ingredient-select" onchange="updateUnitDropdown(this)">
+                <option value="">{{ t("ingredients") }}...</option>
+                ${allIngredients.map(ing => `<option value="${ing.id}">${ing.name}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input type="number" step="0.01" name="amount[]" class="form-control" placeholder="{{ t("quantity") }}">
+        </div>
+        <div class="col-md-2">
+            <select name="unit_id[]" class="form-select unit-select">
+                <option value="">{{ t("unit_type") }}...</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input type="hidden" name="step_num[]" value="${stepNum}">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button>
+        </div>
+    `;
+    container.appendChild(row);
+}
 
-        function updateUnitDropdown(select) {
-            const row = select.closest('.ingredient-row');
-            const unitSelect = row.querySelector('.unit-select');
-            const ingredientId = select.value;
-            const ing = allIngredients.find(i => i.id === parseInt(ingredientId));
-            const preferredUnitId = ing ? ing.preferred_unit_id : null;
-            unitSelect.innerHTML = buildUnitsOptions(ingredientId, preferredUnitId);
-        }
+function updateUnitDropdown(select) {
+    const row = select.closest('.ingredient-row');
+    const unitSelect = row.querySelector('.unit-select');
+    const ingredientId = select.value;
+    const ing = allIngredients.find(i => i.id === parseInt(ingredientId));
+    const preferredUnitId = ing ? ing.preferred_unit_id : null;
+    unitSelect.innerHTML = buildUnitsOptions(ingredientId, preferredUnitId);
+}
 
-        function addStep() {
-            stepCount++;
-            const container = document.getElementById('steps-container');
-            const stepDiv = document.createElement('div');
-            stepDiv.className = 'card mb-3';
-            stepDiv.id = 'step-' + stepCount;
-            stepDiv.innerHTML = `
-                <div class="card-body">
-                    <h6>{{ t("step") }} ${stepCount}</h6>
-                    <div class="mb-3">
-                        <textarea name="step_instruction[]" class="form-control" rows="2" placeholder="{{ t("instructions") }}..."></textarea>
-                    </div>
-                    <div id="step-${stepCount}-ingredients"></div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addIngredient(${stepCount})">+ {{ t("add_ingredient") }}</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm ms-2" onclick="removeStep(${stepCount})">{{ t("delete") }}</button>
-                </div>
-            `;
-            container.appendChild(stepDiv);
-        }
+function addStep() {
+    stepCount++;
+    const container = document.getElementById('steps-container');
+    const stepDiv = document.createElement('div');
+    stepDiv.className = 'card mb-3';
+    stepDiv.id = 'step-' + stepCount;
+    stepDiv.innerHTML = `
+        <div class="card-body">
+            <h6>{{ t("step") }} ${stepCount}</h6>
+            <div class="mb-3">
+                <textarea name="step_instruction[]" class="form-control" rows="2" placeholder="{{ t("instructions") }}..."></textarea>
+            </div>
+            <div id="step-${stepCount}-ingredients"></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addIngredient(${stepCount})">+ {{ t("add_ingredient") }}</button>
+            <button type="button" class="btn btn-outline-danger btn-sm ms-2" onclick="removeStep(${stepCount})">{{ t("delete") }}</button>
+        </div>
+    `;
+    container.appendChild(stepDiv);
+}
 
-        function removeRow(btn) {
-            btn.closest('.ingredient-row').remove();
-        }
-
-        function removeStep(num) {
-            document.getElementById('step-' + num).remove();
-        }
-    </script>
-</body>
-</html>
+function removeRow(btn) { btn.closest('.ingredient-row').remove(); }
+function removeStep(num) { document.getElementById('step-' + num).remove(); }
+</script>
+{% endblock %}

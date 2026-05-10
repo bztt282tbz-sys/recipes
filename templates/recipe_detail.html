@@ -1,133 +1,186 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ recipe.title }} - Recipe Vault</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
-    <style>
-        .badge-clickable { cursor: pointer; }
-        .badge-clickable:hover { opacity: 0.8; }
-    </style>
-</head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('home') }}">{{ t('home') }}</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ translate(recipe.title) }}</li>
-            </ol>
-        </nav>
+{% extends "base.html" %}
 
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <h1>{{ translate(recipe.title) }}</h1>
-                        <p class="lead text-muted">{{ translate(recipe.description) if recipe.description else '' }}</p>
-                        {% if recipe.instructions %}
-                        <hr>
-                        <h4>{{ t('notes') }}</h4>
-                        <p style="white-space: pre-wrap;">{{ translate(recipe.instructions) }}</p>
-                        {% endif %}
-                    </div>
-                </div>
+{% block extra_css %}
+<style>
+    .badge-clickable { cursor: pointer; }
+    .badge-clickable:hover { opacity: 0.8; }
+    .lang-badge { font-size: 0.75rem; }
+</style>
+{% endblock %}
 
-                {% if recipe.steps %}
-                {% for step in recipe.steps %}
-                <div class="card shadow mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ t('step') }} {{ step.step_number }}</h5>
-                        <p style="white-space: pre-wrap;">{{ translate(step.instruction) }}</p>
-                        {% set step_ings = recipe.steps_dict.get(step.step_number, []) %}
-                        {% if step_ings %}
-                        <hr>
-                        <h6>{{ t('ingredients_for_step') }}:</h6>
-                        <ul class="list-group list-group-flush mb-2">
-                            {% for ri in step_ings %}
-                            {% set ing_units = ri.ingredient.get_available_units() %}
-                            {% set unit_grams = 1.0 %}
-                            {% if ri.unit %}
-                                {% if ri.unit.unit_type == 'volume' %}
-                                    {% set density = ri.ingredient.density if ri.ingredient.density else 1.0 %}
-                                    {% set unit_grams = ri.unit.grams_conversion * density %}
-                                {% else %}
-                                    {% set unit_grams = ri.unit.grams_conversion %}
-                                {% endif %}
-                            {% endif %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ translate(ri.ingredient.name) }}
-                                <div class="dropdown">
-                                    <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ ri.ingredient.id }}" data-total-grams="{{ ri.amount_grams }}" data-original-amount="{{ ri.amount }}" data-original-unit="{{ ri.display_unit }}" data-original-unit-grams="{{ unit_grams }}" data-density="{{ ri.ingredient.density or '' }}" data-density-unit="{{ ri.ingredient.density_unit or '' }}" data-grams-per-unit="{{ ri.ingredient.grams_per_unit or '' }}">
-                                        {{ ri.amount }} {{ ri.display_unit }}
-                                    </span>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ri.display_unit }} ({{ t('original') }})</a></li>
-                                        {% for unit in ing_units %}
-                                        {% if ri.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
-                                        <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
-                                        {% endif %}
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+{% block content %}
+{% set recipe_langs = recipe.language_list %}
+{% set current_title = recipe.get_title() %}
+{% set current_desc = recipe.get_description() %}
+{% set current_notes = recipe.instructions %}
+{% if view_lang != 'en' and view_lang in recipe_langs %}
+    {% set trans = recipe.translations|selectattr('language', 'equalto', view_lang)|first %}
+    {% if trans %}
+        {% set current_title = trans.title %}
+        {% set current_desc = trans.description or '' %}
+        {% set current_notes = trans.instructions or '' %}
+    {% endif %}
+{% endif %}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('home') }}">{{ t('home') }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ current_title }}</li>
+    </ol>
+</nav>
+
+{% if recipe_langs|length > 1 or (current_user.is_authenticated and recipe.creator_id == current_user.id and recipe_langs|length < 3) %}
+<div class="mb-3">
+    <span class="text-muted me-2">{{ t('languages') }}:</span>
+    {% for l in recipe_langs %}
+    <a href="{{ url_for('recipe_detail', recipe_id=recipe.id, lang=l) }}" class="btn btn-sm btn{% if l == view_lang %}-primary{% else %}-outline-secondary{% endif %} lang-badge me-1">{{ l|upper }}</a>
+    {% endfor %}
+    {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
+    {% if 'de' not in recipe_langs %}
+    <a href="{{ url_for('manage_translation', recipe_id=recipe.id, lang='de') }}" class="btn btn-sm btn-outline-success lang-badge me-1">+DE</a>
+    {% endif %}
+    {% if 'ru' not in recipe_langs %}
+    <a href="{{ url_for('manage_translation', recipe_id=recipe.id, lang='ru') }}" class="btn btn-sm btn-outline-success lang-badge me-1">+RU</a>
+    {% endif %}
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h1>{{ current_title }}</h1>
+                <p class="lead text-muted">{{ current_desc or '' }}</p>
+                {% if current_notes %}
+                <hr>
+                <h4>{{ t('notes') }}</h4>
+                <p style="white-space: pre-wrap;">{{ current_notes }}</p>
                 {% endif %}
             </div>
+        </div>
 
-            <div class="col-md-4">
-                {% if recipe.portions %}
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <h4 class="card-title">{{ t('portions') }}</h4>
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="btn-group" role="group">
-                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease2">--</button>
-                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease">-</button>
-                            </div>
-                            <span class="mx-2 portions-display">{{ recipe.portions }}</span>
-                            <div class="btn-group" role="group">
-                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase">+</button>
-                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase2">++</button>
-                            </div>
+        {% if recipe.steps %}
+        {% set step_instructions = {} %}
+        {% if view_lang != 'en' and view_lang in recipe_langs %}
+            {% for st in recipe.steps_translations|selectattr('language', 'equalto', view_lang) %}
+                {% set _ = step_instructions.update({st.step_number: st.instruction}) %}
+            {% endfor %}
+        {% endif %}
+        {% for step in recipe.steps %}
+        <div class="card shadow mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ t('step') }} {{ step.step_number }}</h5>
+                <p style="white-space: pre-wrap;">{{ step_instructions[step.step_number] or step.instruction }}</p>
+                {% set step_ings = recipe.steps_dict.get(step.step_number, []) %}
+                {% if step_ings %}
+                <hr>
+                <h6>{{ t('ingredients_for_step') }}:</h6>
+                <ul class="list-group list-group-flush mb-2">
+                    {% for ri in step_ings %}
+                    {% set ing_units = ri.ingredient.get_available_units() %}
+                    {% set unit_grams = 1.0 %}
+                    {% if ri.unit %}
+                        {% if ri.unit.unit_type == 'volume' %}
+                            {% set density = ri.ingredient.density if ri.ingredient.density else 1.0 %}
+                            {% set unit_grams = ri.unit.grams_conversion * density %}
+                        {% else %}
+                            {% set unit_grams = ri.unit.grams_conversion %}
+                        {% endif %}
+                    {% endif %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ ri.ingredient.name }}
+                        <div class="dropdown">
+                            <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ ri.ingredient.id }}" data-total-grams="{{ ri.amount_grams }}" data-original-amount="{{ ri.amount }}" data-original-unit="{{ ri.display_unit }}" data-original-unit-grams="{{ unit_grams }}" data-density="{{ ri.ingredient.density or '' }}" data-density-unit="{{ ri.ingredient.density_unit or '' }}" data-grams-per-unit="{{ ri.ingredient.grams_per_unit or '' }}">
+                                {{ ri.amount }} {{ ri.display_unit }}
+                            </span>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ri.display_unit }} ({{ t('original') }})</a></li>
+                                {% for unit in ing_units %}
+                                {% if ri.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
+                                {% endif %}
+                                {% endfor %}
+                            </ul>
                         </div>
-                        <input type="hidden" id="base-portions" value="{{ recipe.portions }}">
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        {% if recipe.portions %}
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h4 class="card-title">{{ t('portions') }}</h4>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease2">--</button>
+                        <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease">-</button>
+                    </div>
+                    <span class="mx-2 portions-display">{{ recipe.portions }}</span>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase">+</button>
+                        <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase2">++</button>
                     </div>
                 </div>
-                {% endif %}
+                <input type="hidden" id="base-portions" value="{{ recipe.portions }}">
+            </div>
+        </div>
+        {% endif %}
 
-                {% if recipe.aggregated_ingredients %}
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <h4 class="card-title">{{ t('ingredients') }}</h4>
-                        <ul class="list-group list-group-flush">
-                            {% for agg in recipe.aggregated_ingredients %}
-                            <li class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <a class="text-decoration-none text-dark" data-bs-toggle="collapse" href="#ing-{{ agg.ingredient.id }}" role="button" aria-expanded="false">
-                                        {{ translate(agg.ingredient.name) }}
-                                        {% if agg.ingredient.comment %}
-                                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-title="{{ agg.ingredient.comment }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle text-muted" viewBox="0 0 16 16">
-                                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                                                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                                            </svg>
+        {% if recipe.aggregated_ingredients %}
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h4 class="card-title">{{ t('ingredients') }}</h4>
+                <ul class="list-group list-group-flush">
+                    {% for agg in recipe.aggregated_ingredients %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a class="text-decoration-none text-dark" data-bs-toggle="collapse" href="#ing-{{ agg.ingredient.id }}" role="button" aria-expanded="false">
+                                {{ agg.ingredient.name }}
+                                {% if agg.ingredient.comment %}
+                                <span class="ms-1" data-bs-toggle="tooltip" data-bs-title="{{ agg.ingredient.comment }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                                    </svg>
+                                </span>
+                                {% endif %}
+                            </a>
+                            <div class="dropdown">
+                                <span class="badge bg-primary rounded-pill badge-clickable portions-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ agg.total_grams }}" data-original-amount="{{ agg.total_amount }}" data-original-unit="{{ agg.display_unit }}" data-original-unit-grams="{{ agg.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
+                                    {{ agg.total_amount }} {{ agg.display_unit }}
+                                </span>
+                                <ul class="dropdown-menu dropdown-menu-end" id="unit-menu-{{ agg.ingredient.id }}">
+                                    <li><h6 class="dropdown-header">{{ t('convert_to') }}</h6></li>
+                                    <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ agg.display_unit }} ({{ t('original') }})</a></li>
+                                    {% for unit in agg.available_units %}
+                                    {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% if agg.steps|length > 0 %}
+                        <div class="collapse mt-2" id="ing-{{ agg.ingredient.id }}">
+                            <small class="text-muted">
+                                {% for step in agg.steps %}
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>{{ t('step') }} {{ step.step_number }}: </span>
+                                    <div class="dropdown d-inline">
+                                        <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ step.grams }}" data-original-amount="{{ step.amount }}" data-original-unit="{{ step.display_unit }}" data-original-unit-grams="{{ step.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
+                                            {{ step.amount }} {{ step.display_unit }}
                                         </span>
-                                        {% endif %}
-                                    </a>
-                                    <div class="dropdown">
-                                        <span class="badge bg-primary rounded-pill badge-clickable portions-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ agg.total_grams }}" data-original-amount="{{ agg.total_amount }}" data-original-unit="{{ agg.display_unit }}" data-original-unit-grams="{{ agg.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                            {{ agg.total_amount }} {{ agg.display_unit }}
-                                        </span>
-                                        <ul class="dropdown-menu dropdown-menu-end" id="unit-menu-{{ agg.ingredient.id }}">
-                                            <li><h6 class="dropdown-header">{{ t('convert_to') }}</h6></li>
-                                            <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ agg.display_unit }} ({{ t('original') }})</a></li>
-                                            {% for unit in agg.available_units %}
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ step.display_unit }} ({{ t('original') }})</a></li>
+                                            {% for unit in step.available_units %}
                                             {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
                                             <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
                                             {% endif %}
@@ -135,219 +188,200 @@
                                         </ul>
                                     </div>
                                 </div>
-                                {% if agg.steps|length > 0 %}
-                                <div class="collapse mt-2" id="ing-{{ agg.ingredient.id }}">
-                                    <small class="text-muted">
-                                        {% for step in agg.steps %}
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span>{{ t('step') }} {{ step.step_number }}: </span>
-                                            <div class="dropdown d-inline">
-                                                <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ step.grams }}" data-original-amount="{{ step.amount }}" data-original-unit="{{ step.display_unit }}" data-original-unit-grams="{{ step.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                                    {{ step.amount }} {{ step.display_unit }}
-                                                </span>
-                                                <ul class="dropdown-menu dropdown-menu-end">
-                                                    <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ step.display_unit }} ({{ t('original') }})</a></li>
-                                                    {% for unit in step.available_units %}
-                                                    {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
-                                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ unit.name }}</a></li>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        {% endfor %}
-                                    </small>
-                                </div>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-                {% endif %}
+                                {% endfor %}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
 
-                {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                <div class="card shadow">
-                    <div class="card-body">
-                        <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary w-100">{{ t('edit_recipe') }}</a>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if current_user.is_authenticated %}
-                <div class="card shadow mt-3">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ t('actions') }}</h5>
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-outline-primary" onclick="checkShelf()">{{ t('check_shelf') }}</button>
-                            <form action="{{ url_for('add_recipe_to_cart', recipe_id=recipe.id) }}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-success w-100">{{ t('add_missing') }}</button>
-                            </form>
-                            <form action="{{ url_for('use_from_shelf', recipe_id=recipe.id) }}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-warning w-100">{{ t('use_from_shelf') }}</button>
-                            </form>
-                            <div class="d-flex gap-1">
-                                <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='en') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">EN</a>
-                                <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='de') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">DE</a>
-                                <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='ru') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">RU</a>
-                            </div>
+        {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
+        <div class="card shadow">
+            <div class="card-body">
+                <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary w-100">{{ t('edit_recipe') }}</a>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if current_user.is_authenticated %}
+        <div class="card shadow mt-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ t('actions') }}</h5>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="checkShelf()">{{ t('check_shelf') }}</button>
+                    <form action="{{ url_for('add_recipe_to_cart', recipe_id=recipe.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-success w-100">{{ t('add_missing') }}</button>
+                    </form>
+                    <form action="{{ url_for('use_from_shelf', recipe_id=recipe.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-warning w-100">{{ t('use_from_shelf') }}</button>
+                    </form>
+                    {% if recipe.creator_id == current_user.id %}
+                    <div class="border-top pt-2 mt-2">
+                        <small class="text-muted">{{ t('languages') }}:</small>
+                        <div class="d-flex gap-1 mt-1">
+                            {% if 'de' not in recipe_langs %}
+                            <a href="{{ url_for('manage_translation', recipe_id=recipe.id, lang='de') }}" class="btn btn-outline-success btn-sm flex-fill">DE</a>
+                            {% endif %}
+                            {% if 'ru' not in recipe_langs %}
+                            <a href="{{ url_for('manage_translation', recipe_id=recipe.id, lang='ru') }}" class="btn btn-outline-success btn-sm flex-fill">RU</a>
+                            {% endif %}
                         </div>
                     </div>
+                    {% endif %}
+                    <div class="d-flex gap-1">
+                        <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='en') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">EN</a>
+                        <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='de') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">DE</a>
+                        <a href="{{ url_for('print_recipe', recipe_id=recipe.id, lang='ru') }}" class="btn btn-outline-dark btn-sm flex-fill" target="_blank">RU</a>
+                    </div>
                 </div>
-                {% endif %}
             </div>
         </div>
+        {% endif %}
     </div>
+</div>
+{% endblock %}
 
-    <div class="modal fade" id="shelfModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ t('shelf_check') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="shelfResults">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('close') }}</button>
-                </div>
+{% block extra_js %}
+<div class="modal fade" id="shelfModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ t('shelf_check') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="shelfResults">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('close') }}</button>
             </div>
         </div>
     </div>
-    
-    <script>
-        function checkShelf() {
-            fetch('{{ url_for("check_shelf", recipe_id=recipe.id) }}', {
-                credentials: 'same-origin'
-            })
-            .then(r => r.json())
-            .then(data => {
-                let html = '<ul class="list-group">';
-                data.results.forEach(r => {
-                    let badgeClass = r.status === 'has_enough' ? 'bg-success' : r.status === 'partial' ? 'bg-warning' : 'bg-danger';
-                    let statusText = r.status === 'has_enough' ? '{{ t("on_shelf") }}' : r.status === 'partial' ? '{{ t("partial") }}' : '{{ t("missing") }}';
-                    let haveText = r.have ? ' ({{ t("have") }} ${r.have} ${r.unit ? r.unit.name : 'g'})' : '';
-                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        ${r.ingredient.name}${haveText}
-                        <span class="badge ${badgeClass}">${statusText}</span>
-                    </li>`;
-                });
-                html += '</ul>';
-                document.getElementById('shelfResults').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('shelfModal')).show();
-            });
-        }
+</div>
+
+<script>
+function checkShelf() {
+    fetch('{{ url_for("check_shelf", recipe_id=recipe.id) }}', { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+        let html = '<ul class="list-group">';
+        data.results.forEach(r => {
+            let badgeClass = r.status === 'has_enough' ? 'bg-success' : r.status === 'partial' ? 'bg-warning' : 'bg-danger';
+            let statusText = r.status === 'has_enough' ? '{{ t("on_shelf") }}' : r.status === 'partial' ? '{{ t("partial") }}' : '{{ t("missing") }}';
+            let haveText = r.have ? ' ({{ t("have") }} ' + r.have + ' ' + (r.unit ? r.unit.name : 'g') + ')' : '';
+            html += '<li class="list-group-item d-flex justify-content-between align-items-center">' + r.ingredient.name + haveText + '<span class="badge ' + badgeClass + '">' + statusText + '</span></li>';
+        });
+        html += '</ul>';
+        document.getElementById('shelfResults').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('shelfModal')).show();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var basePortions = parseFloat(document.getElementById('base-portions')?.value || 1);
+    var currentMultiplier = 1;
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    function updatePortionsDisplay(newPortions) {
+        var multiplier = newPortions / basePortions;
+        currentMultiplier = multiplier;
+        var display = document.querySelector('.portions-display');
+        if (display) display.textContent = Math.round(newPortions * 100) / 100;
         
-        document.addEventListener('DOMContentLoaded', function() {
-            var basePortions = parseFloat(document.getElementById('base-portions').value);
-            var currentMultiplier = 1;
+        document.querySelectorAll('.portions-btn[data-action="decrease"]').forEach(function(btn) {
+            btn.disabled = newPortions <= 0.25;
+        });
+        document.querySelectorAll('.portions-btn[data-action="decrease2"]').forEach(function(btn) {
+            btn.disabled = newPortions <= 0.25;
+        });
+        
+        document.querySelectorAll('.portions-badge, .step-badge').forEach(function(badge) {
+            var originalAmount = parseFloat(badge.dataset.originalAmount);
+            var originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
+            var originalUnit = badge.dataset.originalUnit;
+            var totalGrams = originalAmount * originalUnitGrams * multiplier;
+            var newAmount = totalGrams / originalUnitGrams;
+            badge.textContent = Math.round(newAmount * 100) / 100 + ' ' + originalUnit;
+        });
+    }
 
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
-            });
+    document.querySelectorAll('.portions-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var currentDisplay = parseFloat(document.querySelector('.portions-display').textContent);
+            var newPortions;
+            switch(this.dataset.action) {
+                case 'increase': newPortions = currentDisplay + 0.25; break;
+                case 'increase2': newPortions = currentDisplay + 1; break;
+                case 'decrease': newPortions = Math.max(0.25, currentDisplay - 0.25); break;
+                case 'decrease2': newPortions = Math.max(0.25, currentDisplay - 1); break;
+            }
+            updatePortionsDisplay(newPortions);
+        });
+    });
 
-            function updatePortionsDisplay(newPortions) {
-                var multiplier = newPortions / basePortions;
-                currentMultiplier = multiplier;
-                document.querySelector('.portions-display').textContent = Math.round(newPortions * 100) / 100;
-                document.querySelector('.portions-btn[data-action="decrease"]').disabled = newPortions <= 0.25;
-                document.querySelector('.portions-btn[data-action="decrease2"]').disabled = newPortions <= 0.25;
-                
-                document.querySelectorAll('.portions-badge, .step-badge').forEach(function(badge) {
-                    var originalAmount = parseFloat(badge.dataset.originalAmount);
-                    var originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
-                    var originalUnit = badge.dataset.originalUnit;
-                    var densityUnit = badge.dataset.densityUnit;
-                    var density = parseFloat(badge.dataset.density) || 1.0;
-                    var gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
-                    
-                    var totalGrams = originalAmount * originalUnitGrams * multiplier;
-                    var newAmount = totalGrams / originalUnitGrams;
-                    
-                    badge.textContent = Math.round(newAmount * 100) / 100 + ' ' + originalUnit;
+    document.querySelectorAll('.dropdown-item[data-unit-id]').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const menu = this.closest('.dropdown-menu');
+            const badge = menu.parentElement.querySelector('.badge');
+            const ingId = badge.dataset.ingId;
+            
+            const originalAmount = parseFloat(badge.dataset.originalAmount);
+            const originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
+            const originalUnit = badge.dataset.originalUnit;
+            const densityUnit = badge.dataset.densityUnit;
+            const density = parseFloat(badge.dataset.density) || 1.0;
+            const gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
+            
+            const unitId = this.dataset.unitId;
+            const unitName = this.dataset.unitName;
+            const unitType = this.dataset.unitType;
+            const gramsConv = parseFloat(this.dataset.grams);
+            
+            const totalGrams = originalAmount * originalUnitGrams * currentMultiplier;
+            
+            if (unitId === 'original') {
+                document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                    const bOriginalAmount = parseFloat(b.dataset.originalAmount) * currentMultiplier;
+                    const bOriginalUnit = b.dataset.originalUnit;
+                    b.textContent = Math.round(bOriginalAmount * 100) / 100 + ' ' + bOriginalUnit;
+                });
+            } else {
+                document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                    let displayAmount;
+                    if (unitType === 'mass') {
+                        displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
+                    } else if (unitType === 'volume') {
+                        if (densityUnit === 'g/unit' && gramsPerUnit) {
+                            displayAmount = Math.round(totalGrams / gramsPerUnit * 100) / 100;
+                        } else {
+                            displayAmount = Math.round(totalGrams / gramsConv / density * 100) / 100;
+                        }
+                    } else {
+                        displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
+                    }
+                    b.textContent = displayAmount + ' ' + unitName;
                 });
             }
-
-            document.querySelectorAll('.portions-btn').forEach(function(btn) {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var currentDisplay = parseFloat(document.querySelector('.portions-display').textContent);
-                    var newPortions;
-                    switch(this.dataset.action) {
-                        case 'increase':
-                            newPortions = currentDisplay + 0.25;
-                            break;
-                        case 'increase2':
-                            newPortions = currentDisplay + 1;
-                            break;
-                        case 'decrease':
-                            newPortions = Math.max(0.25, currentDisplay - 0.25);
-                            break;
-                        case 'decrease2':
-                            newPortions = Math.max(0.25, currentDisplay - 1);
-                            break;
-                    }
-                    updatePortionsDisplay(newPortions);
+            
+            document.querySelectorAll('.dropdown-menu').forEach(function(m) {
+                m.querySelectorAll('.dropdown-item').forEach(function(i) {
+                    i.classList.remove('active');
                 });
             });
-
-            document.querySelectorAll('.dropdown-item[data-unit-id]').forEach(function(item) {
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const menu = this.closest('.dropdown-menu');
-                    const badge = menu.parentElement.querySelector('.badge');
-                    const ingId = badge.dataset.ingId;
-                    
-                    const originalAmount = parseFloat(badge.dataset.originalAmount);
-                    const originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
-                    const originalUnit = badge.dataset.originalUnit;
-                    const densityUnit = badge.dataset.densityUnit;
-                    const density = parseFloat(badge.dataset.density) || 1.0;
-                    const gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
-                    
-                    const unitId = this.dataset.unitId;
-                    const unitName = this.dataset.unitName;
-                    const unitType = this.dataset.unitType;
-                    const gramsConv = parseFloat(this.dataset.grams);
-                    
-                    const totalGrams = originalAmount * originalUnitGrams * currentMultiplier;
-                    
-                    if (unitId === 'original') {
-                        document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
-                            const bOriginalAmount = parseFloat(b.dataset.originalAmount) * currentMultiplier;
-                            const bOriginalUnit = b.dataset.originalUnit;
-                            b.textContent = Math.round(bOriginalAmount * 100) / 100 + ' ' + bOriginalUnit;
-                        });
-                    } else {
-                        document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
-                            let displayAmount;
-                            if (unitType === 'mass') {
-                                displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
-                            } else if (unitType === 'volume') {
-                                if (densityUnit === 'g/unit' && gramsPerUnit) {
-                                    displayAmount = Math.round(totalGrams / gramsPerUnit * 100) / 100;
-                                } else {
-                                    displayAmount = Math.round(totalGrams / gramsConv / density * 100) / 100;
-                                }
-                            } else {
-                                displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
-                            }
-                            b.textContent = displayAmount + ' ' + unitName;
-                        });
-                    }
-                    
-                    document.querySelectorAll('.dropdown-menu').forEach(function(m) {
-                        m.querySelectorAll('.dropdown-item').forEach(function(i) {
-                            i.classList.remove('active');
-                        });
-                    });
-                    this.classList.add('active');
-                });
-            });
+            this.classList.add('active');
         });
-    </script>
-</body>
-</html>
+    });
+});
+</script>
+{% endblock %}

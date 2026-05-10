@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Recipe Vault{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+    <style>
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            min-height: 100vh;
+        }
+        .navbar {
+            background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%) !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .lang-badge { font-size: 0.7rem; }
+        .recipe-meta svg {
+            width: 14px;
+            height: 14px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
+            <div class="d-flex align-items-center">
+                {% set current_path = request.full_path or '/' %}
+                {% for l, label in languages %}
+                <a href="{{ url_for('set_language', lang_code=l) }}?back_to={{ current_path|urlencode }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
+                {% endfor %}
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('shelf') }}" class="btn btn-outline-light btn-sm">{{ t('shelf') }}</a>
+                    <a href="{{ url_for('shopping_cart') }}" class="btn btn-outline-light btn-sm">{{ t('cart') }}</a>
+                    <a href="{{ url_for('add_recipe') }}" class="btn btn-outline-light btn-sm">{{ t('add_recipe') }}</a>
+                    <a href="{{ url_for('add_ingredient') }}" class="btn btn-outline-light btn-sm">{{ t('add_ingredient') }}</a>
+                    <a href="{{ url_for('add_unit') }}" class="btn btn-outline-light btn-sm">{{ t('add_unit') }}</a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm ms-2">{{ t('logout') }}</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">{{ t('login') }}</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm ms-2">{{ t('register') }}</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
