@@ -85,7 +85,18 @@
                 <div class="card shadow mb-4">
                     <div class="card-body">
                         <h4 class="card-title">Portions</h4>
-                        <p class="mb-0">{{ recipe.portions }} portions</p>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease2">--</button>
+                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="decrease">-</button>
+                            </div>
+                            <span class="mx-2 portions-display">{{ recipe.portions }}</span>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase">+</button>
+                                <button class="btn btn-sm btn-outline-secondary portions-btn" data-action="increase2">++</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="base-portions" value="{{ recipe.portions }}">
                     </div>
                 </div>
                 {% endif %}
@@ -168,10 +179,59 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            var basePortions = parseFloat(document.getElementById('base-portions').value);
+            var currentMultiplier = 1;
+
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
+
+            function updatePortionsDisplay(newPortions) {
+                var multiplier = newPortions / basePortions;
+                currentMultiplier = multiplier;
+                document.querySelector('.portions-display').textContent = Math.round(newPortions * 100) / 100;
+                document.querySelector('.portions-btn[data-action="decrease"]').disabled = newPortions <= 0.25;
+                document.querySelector('.portions-btn[data-action="decrease2"]').disabled = newPortions <= 0.25;
+                
+                document.querySelectorAll('.portions-badge, .step-badge').forEach(function(badge) {
+                    var originalAmount = parseFloat(badge.dataset.originalAmount);
+                    var originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
+                    var originalUnit = badge.dataset.originalUnit;
+                    var densityUnit = badge.dataset.densityUnit;
+                    var density = parseFloat(badge.dataset.density) || 1.0;
+                    var gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
+                    
+                    var totalGrams = originalAmount * originalUnitGrams * multiplier;
+                    var newAmount = totalGrams / originalUnitGrams;
+                    
+                    badge.textContent = Math.round(newAmount * 100) / 100 + ' ' + originalUnit;
+                });
+            }
+
+            document.querySelectorAll('.portions-btn').forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var currentDisplay = parseFloat(document.querySelector('.portions-display').textContent);
+                    var newPortions;
+                    switch(this.dataset.action) {
+                        case 'increase':
+                            newPortions = currentDisplay + 0.25;
+                            break;
+                        case 'increase2':
+                            newPortions = currentDisplay + 1;
+                            break;
+                        case 'decrease':
+                            newPortions = Math.max(0.25, currentDisplay - 0.25);
+                            break;
+                        case 'decrease2':
+                            newPortions = Math.max(0.25, currentDisplay - 1);
+                            break;
+                    }
+                    updatePortionsDisplay(newPortions);
+                });
+            });
+
             document.querySelectorAll('.dropdown-item[data-unit-id]').forEach(function(item) {
                 item.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -191,13 +251,13 @@
                     const unitType = this.dataset.unitType;
                     const gramsConv = parseFloat(this.dataset.grams);
                     
-                    const totalGrams = originalAmount * originalUnitGrams;
+                    const totalGrams = originalAmount * originalUnitGrams * currentMultiplier;
                     
                     if (unitId === 'original') {
                         document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
-                            const bOriginalAmount = parseFloat(b.dataset.originalAmount);
+                            const bOriginalAmount = parseFloat(b.dataset.originalAmount) * currentMultiplier;
                             const bOriginalUnit = b.dataset.originalUnit;
-                            b.textContent = bOriginalAmount + ' ' + bOriginalUnit;
+                            b.textContent = Math.round(bOriginalAmount * 100) / 100 + ' ' + bOriginalUnit;
                         });
                     } else {
                         document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
