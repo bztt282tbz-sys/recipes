@@ -54,6 +54,14 @@
                                 <button type="submit" class="btn btn-sm btn-primary">{{ t('save') }}</button>
                             </form>
                             <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#transModal{{ ing.id }}">{{ t('add_language') }}</button>
+                            {% if current_user.is_admin or ing.creator_id == current_user.id %}
+                            <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('confirm_delete') }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="delete_ingredient">
+                                <input type="hidden" name="ingredient_id" value="{{ ing.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">{{ t('delete_ingredient') }}</button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     <tr>
@@ -143,6 +151,14 @@
                                 <button type="submit" class="btn btn-sm btn-primary">{{ t('save') }}</button>
                             </td>
                         </form>
+                            {% if current_user.is_admin or unit.creator_id == current_user.id %}
+                            <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('confirm_delete') }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="delete_unit">
+                                <input type="hidden" name="unit_id" value="{{ unit.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">{{ t('delete_unit') }}</button>
+                            </form>
+                            {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>

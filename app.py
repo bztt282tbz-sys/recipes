@@ -369,8 +369,15 @@ def inject_translations():
             'shopping_list_title': 'Shopping List', 'copy_to_clipboard': 'Copy to Clipboard',
             'recipe_created': 'Recipe created!', 'recipe_updated': 'Recipe updated!',
             'print_recipe': 'Print Recipe', 'english': 'English', 'german': 'German', 'russian': 'Russian',
-            'settings': 'Settings', 'admin_panel': 'Admin Panel', 'users': 'Users', 'promote': 'Promote to Admin',
+            'settings': 'Settings',             'admin_panel': 'Admin Panel', 'users': 'Users', 'promote': 'Promote to Admin',
             'demote': 'Demote from Admin', 'pause_user': 'Pause User', 'activate_user': 'Activate User',
+            'delete_user': 'Delete User', 'user_deleted': 'User deleted.',
+            'confirm_delete_user': 'Delete this user and ALL their data (recipes, ingredients, units)? This cannot be undone.',
+            'delete_recipe': 'Delete Recipe', 'recipe_deleted': 'Recipe deleted.',
+            'delete_ingredient': 'Delete Ingredient', 'ingredient_deleted': 'Ingredient deleted.',
+            'ingredient_in_use': 'Cannot delete ingredient "%s" — it is used in %d recipe(s).',
+            'delete_unit': 'Delete Unit', 'unit_deleted': 'Unit deleted.',
+            'unit_in_use': 'Cannot delete unit "%s" — it is used in %d recipe(s).',
             'change_name': 'Change Name', 'change_password': 'Change Password', 'current_password': 'Current Password',
             'new_password': 'New Password', 'confirm_password': 'Confirm Password', 'name_updated': 'Name updated!',
             'password_updated': 'Password updated!', 'wrong_password': 'Current password is incorrect.',
@@ -453,8 +460,15 @@ def inject_translations():
             'copy_to_clipboard': 'In Zwischenablage kopieren',
             'recipe_created': 'Rezept erstellt!', 'recipe_updated': 'Rezept aktualisiert!',
             'print_recipe': 'Rezept drucken', 'english': 'Englisch', 'german': 'Deutsch', 'russian': 'Russisch',
-            'settings': 'Einstellungen', 'admin_panel': 'Admin-Panel', 'users': 'Benutzer', 'promote': 'Zum Admin machen',
+            'settings': 'Einstellungen',             'admin_panel': 'Admin-Panel', 'users': 'Benutzer', 'promote': 'Zum Admin machen',
             'demote': 'Admin-Status entfernen', 'pause_user': 'Benutzer pausieren', 'activate_user': 'Benutzer aktivieren',
+            'delete_user': 'Benutzer löschen', 'user_deleted': 'Benutzer gelöscht.',
+            'confirm_delete_user': 'Diesen Benutzer und ALLE seine Daten (Rezepte, Zutaten, Einheiten) löschen? Dies kann nicht rückgängig gemacht werden.',
+            'delete_recipe': 'Rezept löschen', 'recipe_deleted': 'Rezept gelöscht.',
+            'delete_ingredient': 'Zutat löschen', 'ingredient_deleted': 'Zutat gelöscht.',
+            'ingredient_in_use': 'Zutat "%s" kann nicht gelöscht werden — sie wird in %d Rezept(en) verwendet.',
+            'delete_unit': 'Einheit löschen', 'unit_deleted': 'Einheit gelöscht.',
+            'unit_in_use': 'Einheit "%s" kann nicht gelöscht werden — sie wird in %d Rezept(en) verwendet.',
             'change_name': 'Name ändern', 'change_password': 'Passwort ändern', 'current_password': 'Aktuelles Passwort',
             'new_password': 'Neues Passwort', 'confirm_password': 'Passwort bestätigen', 'name_updated': 'Name aktualisiert!',
             'password_updated': 'Passwort aktualisiert!', 'wrong_password': 'Aktuelles Passwort ist falsch.',
@@ -537,8 +551,15 @@ def inject_translations():
             'copy_to_clipboard': 'Копировать в буфер',
             'recipe_created': 'Рецепт создан!', 'recipe_updated': 'Рецепт обновлён!',
             'print_recipe': 'Печать рецепта', 'english': 'Английский', 'german': 'Немецкий', 'russian': 'Русский',
-            'settings': 'Настройки', 'admin_panel': 'Админ-панель', 'users': 'Пользователи', 'promote': 'Сделать админом',
+            'settings': 'Настройки',             'admin_panel': 'Админ-панель', 'users': 'Пользователи', 'promote': 'Сделать админом',
             'demote': 'Убрать статус админа', 'pause_user': 'Приостановить пользователя', 'activate_user': 'Активировать пользователя',
+            'delete_user': 'Удалить пользователя', 'user_deleted': 'Пользователь удалён.',
+            'confirm_delete_user': 'Удалить этого пользователя и ВСЕ его данные (рецепты, ингредиенты, единицы)? Это действие необратимо.',
+            'delete_recipe': 'Удалить рецепт', 'recipe_deleted': 'Рецепт удалён.',
+            'delete_ingredient': 'Удалить ингредиент', 'ingredient_deleted': 'Ингредиент удалён.',
+            'ingredient_in_use': 'Ингредиент "%s" нельзя удалить — он используется в %d рецепте(ах).',
+            'delete_unit': 'Удалить единицу', 'unit_deleted': 'Единица удалена.',
+            'unit_in_use': 'Единицу "%s" нельзя удалить — она используется в %d рецепте(ах).',
             'change_name': 'Изменить имя', 'change_password': 'Изменить пароль', 'current_password': 'Текущий пароль',
             'new_password': 'Новый пароль', 'confirm_password': 'Подтвердите пароль', 'name_updated': 'Имя обновлено!',
             'password_updated': 'Пароль обновлён!', 'wrong_password': 'Текущий пароль неверный.',
@@ -798,7 +819,7 @@ def add_recipe():
 @login_required
 def edit_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
-    if recipe.creator_id != current_user.id:
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
         flash('You cannot edit this recipe.', 'danger')
         return redirect(url_for('home'))
 
@@ -897,13 +918,27 @@ def edit_recipe(recipe_id):
 @login_required
 def ungroup_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
-    if recipe.creator_id != current_user.id:
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
         flash('You cannot modify this recipe.', 'danger')
         return redirect(url_for('home'))
     recipe.group_id = None
     db.session.commit()
     flash('Recipe removed from group.', 'success')
     return redirect(url_for('edit_recipe', recipe_id=recipe.id))
+
+@app.route("/recipe/<int:recipe_id>/delete", methods=['POST'])
+@login_required
+def delete_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
+        flash('You cannot delete this recipe.', 'danger')
+        return redirect(url_for('home'))
+    RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
+    RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
+    db.session.delete(recipe)
+    db.session.commit()
+    flash('Recipe deleted.', 'success')
+    return redirect(url_for('home'))
 
 @app.route("/api/units/<int:ingredient_id>")
 @login_required
@@ -1055,6 +1090,21 @@ def admin_panel():
             target_user.is_paused = not target_user.is_paused
             db.session.commit()
             flash('User updated.', 'success')
+        elif action == 'delete_user':
+            for recipe in Recipe.query.filter_by(creator_id=target_user.id).all():
+                RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
+                RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
+                db.session.delete(recipe)
+            for ingredient in Ingredient.query.filter_by(creator_id=target_user.id).all():
+                UnitIngredient.query.filter_by(ingredient_id=ingredient.id).delete()
+                IngredientTranslation.query.filter_by(ingredient_id=ingredient.id).delete()
+                db.session.delete(ingredient)
+            for unit in Unit.query.filter_by(creator_id=target_user.id).all():
+                UnitIngredient.query.filter_by(unit_id=unit.id).delete()
+                db.session.delete(unit)
+            db.session.delete(target_user)
+            db.session.commit()
+            flash('User deleted.', 'success')
 
         return redirect(url_for('admin_panel'))
 
@@ -1233,7 +1283,7 @@ def manage_data():
         if action == 'edit_ingredient':
             ing_id = request.form.get('ingredient_id')
             ingredient = Ingredient.query.get(ing_id)
-            if ingredient and ingredient.creator_id == current_user.id:
+            if ingredient and (ingredient.creator_id == current_user.id or current_user.is_admin):
                 ingredient.name = request.form.get('name', '').strip()
                 density_val = request.form.get('density')
                 if density_val:
@@ -1256,7 +1306,7 @@ def manage_data():
         elif action == 'edit_unit':
             unit_id = request.form.get('unit_id')
             unit = Unit.query.get(unit_id)
-            if unit and unit.creator_id == current_user.id:
+            if unit and (unit.creator_id == current_user.id or current_user.is_admin):
                 unit.name = request.form.get('name', '').strip()
                 unit.name_ru = request.form.get('name_ru', '').strip() or None
                 unit.unit_type = request.form.get('unit_type')
@@ -1288,14 +1338,45 @@ def manage_data():
                 db.session.commit()
                 flash('Translation saved!', 'success')
 
+        elif action == 'delete_ingredient':
+            ing_id = request.form.get('ingredient_id')
+            ingredient = Ingredient.query.get(ing_id)
+            if ingredient and (ingredient.creator_id == current_user.id or current_user.is_admin):
+                in_use_count = RecipeIngredient.query.filter_by(ingredient_id=ingredient.id).count()
+                if in_use_count > 0:
+                    flash(f'Cannot delete ingredient "{ingredient.get_name("en")}" — it is used in {in_use_count} recipe(s).', 'danger')
+                else:
+                    UnitIngredient.query.filter_by(ingredient_id=ingredient.id).delete()
+                    IngredientTranslation.query.filter_by(ingredient_id=ingredient.id).delete()
+                    db.session.delete(ingredient)
+                    db.session.commit()
+                    flash('Ingredient deleted.', 'success')
+
+        elif action == 'delete_unit':
+            unit_id = request.form.get('unit_id')
+            unit = Unit.query.get(unit_id)
+            if unit and (unit.creator_id == current_user.id or current_user.is_admin):
+                in_use_count = RecipeIngredient.query.filter_by(unit_id=unit.id).count()
+                if in_use_count > 0:
+                    flash(f'Cannot delete unit "{unit.get_name("en")}" — it is used in {in_use_count} recipe(s).', 'danger')
+                else:
+                    UnitIngredient.query.filter_by(unit_id=unit.id).delete()
+                    db.session.delete(unit)
+                    db.session.commit()
+                    flash('Unit deleted.', 'success')
+
         return redirect(url_for('manage_data'))
 
-    ingredients = Ingredient.query.filter(
-        (Ingredient.creator_id == current_user.id) | (Ingredient.creator_id == None)
-    ).all()
-    units = Unit.query.filter(
-        (Unit.creator_id == current_user.id) | (Unit.creator_id == None)
-    ).all()
+    if current_user.is_admin:
+        ingredients = Ingredient.query.all()
+        units = Unit.query.all()
+    else:
+        ingredients = Ingredient.query.filter(
+            (Ingredient.creator_id == current_user.id) | (Ingredient.creator_id == None)
+        ).all()
+        units = Unit.query.filter(
+            (Unit.creator_id == current_user.id) | (Unit.creator_id == None)
+        ).all()
 
     return render_template('manage_data.html', ingredients=ingredients, units=units)
 

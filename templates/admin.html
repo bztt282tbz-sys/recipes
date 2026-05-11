@@ -63,6 +63,12 @@
                                 {% if user.is_paused %}{{ t('activate_user') }}{% else %}{{ t('pause_user') }}{% endif %}
                             </button>
                         </form>
+                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('confirm_delete_user') }}')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="user_id" value="{{ user.id }}">
+                            <input type="hidden" name="action" value="delete_user">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">{{ t('delete_user') }}</button>
+                        </form>
                     {% endif %}
                 </td>
             </tr>

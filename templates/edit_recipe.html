@@ -108,9 +108,17 @@
                         <input type="checkbox" name="is_draft" class="form-check-input" id="draftCheck" {% if recipe.is_draft %}checked{% endif %}>
                         <label class="form-check-label" for="draftCheck">{{ t('is_draft') }}</label>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-secondary">{{ t('cancel') }}</a>
-                        <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-secondary">{{ t('cancel') }}</a>
+                            <button type="submit" class="btn btn-primary ms-2">{{ t('save') }}</button>
+                        </div>
+                        {% if current_user.is_admin or recipe.creator_id == current_user.id %}
+                        <form method="POST" action="{{ url_for('delete_recipe', recipe_id=recipe.id) }}" onsubmit="return confirm('{{ t('confirm_delete') }}?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger">{{ t('delete_recipe') }}</button>
+                        </form>
+                        {% endif %}
                     </div>
                 </form>
             </div>
