@@ -1,7 +1,7 @@
-import multipro
+import multiprocessing
 import os
 
-bind = os.environ.get("GUNICORN_BIND", "0.0.0.0:8001")
+bind = os.environ.get("GUNICORN_BIND", "0.0.0.0:5000")
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "sync"
 worker_connections = 1000

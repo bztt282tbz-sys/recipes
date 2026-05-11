@@ -377,6 +377,7 @@ def inject_translations():
             'passwords_mismatch': 'Passwords do not match.', 'is_admin': 'Admin', 'is_paused': 'Paused',
             'active': 'Active', 'change_name_title': 'Change Username', 'change_password_title': 'Change Password',
             'current_password_required': 'Current password is required to make changes.',
+            'add_demo_recipe': 'Add Demo Recipe', 'demo_recipe_exists': 'Demo Recipe Exists',
         },
         'de': {
             'home': 'Startseite', 'add_recipe': 'Rezept hinzufügen',
@@ -418,6 +419,7 @@ def inject_translations():
             'passwords_mismatch': 'Passwörter stimmen nicht überein.', 'is_admin': 'Admin', 'is_paused': 'Pausiert',
             'active': 'Aktiv', 'change_name_title': 'Benutzername ändern', 'change_password_title': 'Passwort ändern',
             'current_password_required': 'Aktuelles Passwort ist erforderlich.',
+            'add_demo_recipe': 'Demo-Rezept hinzufügen', 'demo_recipe_exists': 'Demo-Rezept existiert',
         },
         'ru': {
             'home': 'Главная', 'add_recipe': 'Добавить рецепт',
@@ -459,6 +461,7 @@ def inject_translations():
             'passwords_mismatch': 'Пароли не совпадают.', 'is_admin': 'Админ', 'is_paused': 'Приостановлен',
             'active': 'Активен', 'change_name_title': 'Изменить имя пользователя', 'change_password_title': 'Изменить пароль',
             'current_password_required': 'Текущий пароль обязателен.',
+            'add_demo_recipe': 'Добавить демо-рецепт', 'demo_recipe_exists': 'Демо-рецепт существует',
         }
     }
 
@@ -888,14 +891,23 @@ def settings():
 @admin_required
 def admin_panel():
     users = User.query.all()
+    demo_recipe_exists = Recipe.query.filter_by(title='Chocolate Cake').first() is not None
+
     if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'add_demo_recipe':
+            if create_demo_recipe():
+                flash('Demo recipe created successfully!', 'success')
+            else:
+                flash('Demo recipe could not be created. Ensure demo user and ingredients exist.', 'danger')
+            return redirect(url_for('admin_panel'))
+
         user_id = request.form.get('user_id')
         target_user = User.query.get(user_id)
         if not target_user or target_user.id == current_user.id:
             flash('Cannot modify this user.', 'danger')
             return redirect(url_for('admin_panel'))
-
-        action = request.form.get('action')
 
         if action == 'toggle_admin':
             target_user.is_admin = not target_user.is_admin
@@ -908,7 +920,7 @@ def admin_panel():
 
         return redirect(url_for('admin_panel'))
 
-    return render_template('admin.html', users=users)
+    return render_template('admin.html', users=users, demo_recipe_exists=demo_recipe_exists)
 
 @app.route("/ingredient/new", methods=['GET', 'POST'])
 @login_required
@@ -1184,6 +1196,106 @@ def print_recipe(recipe_id):
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
 
+def create_demo_recipe():
+    user = User.query.filter_by(username='demo').first()
+    if not user:
+        return False
+
+    if Recipe.query.filter_by(title='Chocolate Cake').first():
+        return False
+
+    flour = Ingredient.query.filter_by(name='Flour (Type 405)').first()
+    cocoa = Ingredient.query.filter_by(name='Cocoa Powder').first()
+    sugar = Ingredient.query.filter_by(name='Sugar').first()
+    oil = Ingredient.query.filter_by(name='Vegetable Oil').first()
+    baking_powder = Ingredient.query.filter_by(name='Baking Powder').first()
+    water = Ingredient.query.filter_by(name='Water').first()
+    vanilla = Ingredient.query.filter_by(name='Vanilla Extract').first()
+    g_unit = Unit.query.filter_by(name='g').first()
+    ml_unit = Unit.query.filter_by(name='mL').first()
+    tbsp_unit = Unit.query.filter_by(name='EL').first()
+    tsp_unit = Unit.query.filter_by(name='TL').first()
+
+    if not all([flour, cocoa, sugar, oil, baking_powder, water, vanilla, g_unit, ml_unit, tbsp_unit, tsp_unit]):
+        return False
+
+    cake_group_id = str(uuid.uuid4())
+
+    recipe_en = Recipe(
+        title='Chocolate Cake',
+        description='A moist chocolate cake with cocoa powder, baked in a springform pan (Ø 20 cm).',
+        instructions='Dust the cake with powdered sugar after it has cooled completely.',
+        is_draft=False,
+        portions=4,
+        language='en',
+        creator_id=user.id,
+        group_id=cake_group_id
+    )
+    db.session.add(recipe_en)
+    db.session.flush()
+
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
+
+    db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=1, instruction='Preheat oven to 180°C (350°F) top/bottom heat (convection: 160°C/320°F). Grease a springform pan (Ø 20 cm) with a little oil. Mix flour with baking powder and cocoa powder.'))
+    db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=2, instruction='Combine with the remaining ingredients and mix well. Pour batter into the springform pan. Bake in preheated oven for about 35 minutes. Test with a wooden skewer to see if done. Let cool completely.'))
+
+    recipe_de = Recipe(
+        title='Schokoladenkuchen',
+        description='Ein saftiger Schokoladenkuchen mit Kakaopulver, gebacken in einer Springform (Ø 20 cm).',
+        instructions='Den Kuchen nach dem vollständigen Abkühlen mit Puderzucker bestreuen.',
+        is_draft=False,
+        portions=4,
+        language='de',
+        creator_id=user.id,
+        group_id=cake_group_id
+    )
+    db.session.add(recipe_de)
+    db.session.flush()
+
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
+
+    db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=1, instruction='Ofen auf 180°C (Ober-/Unterhitze, Umluft: 160°C) vorheizen. Eine Springform (Ø 20 cm) mit etwas Öl einfetten. Mehl mit Backpulver und Kakaopulver mischen.'))
+    db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=2, instruction='Mit den restlichen Zutaten gut vermischen. Teig in die Springform füllen. Im vorgeheizten Ofen ca. 35 Minuten backen. Mit einem Holzstäbchen testen. Vollständig abkühlen lassen.'))
+
+    recipe_ru = Recipe(
+        title='Шоколадный торт',
+        description='Влажный шоколадный торт с какао-порошком, выпеченный в разъёмной форме (Ø 20 см).',
+        instructions='Посыпьте торт сахарной пудрой после полного остывания.',
+        is_draft=False,
+        portions=4,
+        language='ru',
+        creator_id=user.id,
+        group_id=cake_group_id
+    )
+    db.session.add(recipe_ru)
+    db.session.flush()
+
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
+    db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
+
+    db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=1, instruction='Разогрейте духовку до 180°C (верхний/нижний жар, конвекция: 160°C). Смажьте разъёмную форму (Ø 20 см) небольшим количеством масла. Смешайте муку с разрыхлителем и какао-порошком.'))
+    db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=2, instruction='Смешайте с оставшимися ингредиентами до однородности. Вылейте тесто в форму. Выпекайте в духовке около 35 минут. Проверьте деревянной шпажкой. Полностью остудите.'))
+
+    db.session.commit()
+    return True
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -1261,93 +1373,6 @@ if __name__ == '__main__':
 
             db.session.commit()
 
-        if not Recipe.query.filter_by(title='Chocolate Cake').first():
-            flour = Ingredient.query.filter_by(name='Flour (Type 405)').first()
-            cocoa = Ingredient.query.filter_by(name='Cocoa Powder').first()
-            sugar = Ingredient.query.filter_by(name='Sugar').first()
-            oil = Ingredient.query.filter_by(name='Vegetable Oil').first()
-            baking_powder = Ingredient.query.filter_by(name='Baking Powder').first()
-            water = Ingredient.query.filter_by(name='Water').first()
-            vanilla = Ingredient.query.filter_by(name='Vanilla Extract').first()
-            g_unit = Unit.query.filter_by(name='g').first()
-            ml_unit = Unit.query.filter_by(name='mL').first()
-            tbsp_unit = Unit.query.filter_by(name='EL').first()
-            tsp_unit = Unit.query.filter_by(name='TL').first()
+        
 
-            cake_group_id = str(uuid.uuid4())
-
-            recipe_en = Recipe(
-                title='Chocolate Cake',
-                description='A moist chocolate cake with cocoa powder, baked in a springform pan (Ø 20 cm).',
-                instructions='Dust the cake with powdered sugar after it has cooled completely.',
-                is_draft=False,
-                portions=4,
-                language='en',
-                creator_id=user.id,
-                group_id=cake_group_id
-            )
-            db.session.add(recipe_en)
-            db.session.flush()
-
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_en.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
-
-            db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=1, instruction='Preheat oven to 180°C (350°F) top/bottom heat (convection: 160°C/320°F). Grease a springform pan (Ø 20 cm) with a little oil. Mix flour with baking powder and cocoa powder.'))
-            db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=2, instruction='Combine with the remaining ingredients and mix well. Pour batter into the springform pan. Bake in preheated oven for about 35 minutes. Test with a wooden skewer to see if done. Let cool completely.'))
-
-            recipe_de = Recipe(
-                title='Schokoladenkuchen',
-                description='Ein saftiger Schokoladenkuchen mit Kakaopulver, gebacken in einer Springform (Ø 20 cm).',
-                instructions='Den Kuchen nach dem vollständigen Abkühlen mit Puderzucker bestreuen.',
-                is_draft=False,
-                portions=4,
-                language='de',
-                creator_id=user.id,
-                group_id=cake_group_id
-            )
-            db.session.add(recipe_de)
-            db.session.flush()
-
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_de.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
-
-            db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=1, instruction='Ofen auf 180°C (Ober-/Unterhitze, Umluft: 160°C) vorheizen. Eine Springform (Ø 20 cm) mit etwas Öl einfetten. Mehl mit Backpulver und Kakaopulver mischen.'))
-            db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=2, instruction='Mit den restlichen Zutaten gut vermischen. Teig in die Springform füllen. Im vorgeheizten Ofen ca. 35 Minuten backen. Mit einem Holzstäbchen testen. Vollständig abkühlen lassen.'))
-
-            recipe_ru = Recipe(
-                title='Шоколадный торт',
-                description='Влажный шоколадный торт с какао-порошком, выпеченный в разъёмной форме (Ø 20 см).',
-                instructions='Посыпьте торт сахарной пудрой после полного остывания.',
-                is_draft=False,
-                portions=4,
-                language='ru',
-                creator_id=user.id,
-                group_id=cake_group_id
-            )
-            db.session.add(recipe_ru)
-            db.session.flush()
-
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=flour.id, amount=250, unit_id=g_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=cocoa.id, amount=3, unit_id=tbsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=baking_powder.id, amount=2.5, unit_id=tsp_unit.id, step_number=1))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=sugar.id, amount=180, unit_id=g_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=oil.id, amount=100, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=water.id, amount=250, unit_id=ml_unit.id, step_number=2))
-            db.session.add(RecipeIngredient(recipe_id=recipe_ru.id, ingredient_id=vanilla.id, amount=1, unit_id=tsp_unit.id, step_number=2))
-
-            db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=1, instruction='Разогрейте духовку до 180°C (верхний/нижний жар, конвекция: 160°C). Смажьте разъёмную форму (Ø 20 см) небольшим количеством масла. Смешайте муку с разрыхлителем и какао-порошком.'))
-            db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=2, instruction='Смешайте с оставшимися ингредиентами до однородности. Вылейте тесто в форму. Выпекайте в духовке около 35 минут. Проверьте деревянной шпажкой. Полностью остудите.'))
-
-            db.session.commit()
-
-    app.run(debug=os.environ.get('FLASK_ENV') != 'production', port=8001)
+    app.run(debug=os.environ.get('FLASK_ENV') != 'production', port=5000)
