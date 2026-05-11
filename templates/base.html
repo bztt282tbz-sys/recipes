@@ -121,7 +121,7 @@
                     {% endif %}
                 </ul>
                 <div class="d-flex align-items-center">
-                    <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-sm me-3">About</a>
+                    <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-sm me-3">{{ t('about') }}</a>
                     {% for l, label in languages %}
                     <a href="{{ url_for('set_language', lang_code=l) }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
                     {% endfor %}
@@ -147,6 +147,13 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <footer class="mt-5 py-3 text-center text-muted small border-top">
+        <div class="container">
+            <a href="{{ url_for('impressum') }}" class="text-muted text-decoration-none me-3">{{ t('impressum') }}</a>
+            <a href="{{ url_for('privacy') }}" class="text-muted text-decoration-none">{{ t('privacy') }}</a>
+        </div>
+    </footer>
 
     <div id="onboarding-overlay" class="onboarding-overlay" style="display:none;">
         <div class="onboarding-card">

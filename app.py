@@ -417,6 +417,9 @@ def inject_translations():
             'onboard_custom_units': 'Create your own ingredients and units with density-aware conversion. Perfect for non-standard measures.',
             'onboard_export_heading': 'Export & Share',
             'onboard_export': 'Download any recipe as Markdown to save, share, or print whenever you need.',
+            'about': 'About',
+            'impressum': 'Impressum',
+            'privacy': 'Datenschutzhinweise',
         },
         'de': {
             'home': 'Startseite', 'add_recipe': 'Rezept hinzufügen',
@@ -498,6 +501,9 @@ def inject_translations():
             'onboard_custom_units': 'Erstellen Sie eigene Zutaten und Einheiten mit dichteabhängiger Umrechnung. Perfekt für nicht standardisierte Maße.',
             'onboard_export_heading': 'Exportieren & Teilen',
             'onboard_export': 'Laden Sie jedes Rezept als Markdown herunter, um es zu speichern, zu teilen oder bei Bedarf auszudrucken.',
+            'about': 'Über',
+            'impressum': 'Impressum',
+            'privacy': 'Datenschutzhinweise',
         },
         'ru': {
             'home': 'Главная', 'add_recipe': 'Добавить рецепт',
@@ -579,6 +585,9 @@ def inject_translations():
             'onboard_custom_units': 'Создавайте собственные ингредиенты и единицы с конвертацией на основе плотности. Идеально для нестандартных мер.',
             'onboard_export_heading': 'Экспорт и отправка',
             'onboard_export': 'Скачивайте любой рецепт в формате Markdown, чтобы сохранить, отправить или распечатать когда угодно.',
+            'about': 'О проекте',
+            'impressum': 'Импрессум',
+            'privacy': 'Защита данных',
         }
     }
 
@@ -618,6 +627,14 @@ def inject_translations():
 @app.route("/about")
 def about():
     return render_template('about.html')
+
+@app.route("/impressum")
+def impressum():
+    return render_template('impressum.html')
+
+@app.route("/privacy")
+def privacy():
+    return render_template('privacy.html')
 
 @app.route("/")
 def home():
