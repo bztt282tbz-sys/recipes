@@ -1,8 +1,8 @@
 .env
 .venv
 instance/
-__pycache__/
-recipes_workspace.xcworkspace/
+not__pycache__/
+notrecipes_workspace.xcworkspace/
 *.pyc
 *.pyo
 *.pyd
