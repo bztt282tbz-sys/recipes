@@ -498,6 +498,10 @@ def inject_translations():
         request=request
     )
 
+@app.route("/about")
+def about():
+    return render_template('about.html')
+
 @app.route("/")
 def home():
     search_query = request.args.get('q', '')

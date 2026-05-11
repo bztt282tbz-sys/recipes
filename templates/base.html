@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Recipe Vault{% endblock %}</title>
+    <title>{% block title %}Flavor Archive{% endblock %}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
     {% block extra_css %}{% endblock %}
@@ -32,7 +32,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('home') }}">Recipe Vault</a>
+            <a class="navbar-brand" href="{{ url_for('home') }}">Flavor Archive</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -59,6 +59,7 @@
                     {% endif %}
                 </ul>
                 <div class="d-flex align-items-center">
+                    <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-sm me-3">About</a>
                     {% for l, label in languages %}
                     <a href="{{ url_for('set_language', lang_code=l) }}" class="btn btn-sm {% if l == lang %}btn-primary{% else %}btn-outline-light{% endif %} me-1">{{ label }}</a>
                     {% endfor %}
