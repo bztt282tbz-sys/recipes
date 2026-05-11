@@ -8,4 +8,4 @@ gunicorn
 python-dotenv
 markupsafe
 deep-translator
-Flask-Talisman
+Flask-Talisman 
