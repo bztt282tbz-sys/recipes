@@ -2,6 +2,7 @@
 .venv
 instance/
 __pycache__/
+recipes_workspace.xcworkspace/
 *.pyc
 *.pyo
 *.pyd
