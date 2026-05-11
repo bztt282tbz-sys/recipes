@@ -162,23 +162,16 @@
         </div>
         {% endif %}
 
-        {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-        <div class="card shadow">
+        <div class="card shadow mb-4">
             <div class="card-body">
-                <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary w-100">{{ t('edit_recipe') }}</a>
+                <h4 class="card-title">{{ t('actions') }}</h4>
+                {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
+                    <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm me-2">{{ t('edit_recipe') }}</a>
+                {% endif %}
+                <a href="{{ url_for('print_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm">{{ t('download') }}</a>
             </div>
         </div>
-        {% endif %}
-
-        {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-        <div class="card shadow mt-3">
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('print_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm">{{ t('download') }}</a>
-                </div>
-            </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

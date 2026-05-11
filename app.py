@@ -1168,6 +1168,9 @@ def manage_data():
 @app.route("/recipe/<int:recipe_id>/print")
 def print_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
+    # Allow download if not draft, or if user is owner of the recipe
+    if recipe.is_draft and (not current_user.is_authenticated or recipe.creator_id != current_user.id):
+        abort(404)
 
     pdf_content = f"""# {recipe.title}
 

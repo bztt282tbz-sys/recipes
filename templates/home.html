@@ -212,7 +212,7 @@
                 {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
                 <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
                 {% endif %}
-                <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
+                <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view" style="margin-left: 4px;">{{ t('view_recipe') }}</a>
             </div>
         </div>
     </div>
@@ -241,12 +241,9 @@
                         <span class="lang-badge ms-1">{{ recipe.language|upper }}</span>
                     </div>
                 </div>
-                <div class="card-footer bg-transparent border-top-0">
-                    {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}
-                    <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-secondary btn-sm btn-edit">{{ t('edit_recipe') }}</a>
-                    {% endif %}
-                    <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view {% if current_user.is_authenticated and recipe.creator_id == current_user.id %}ms-1{% endif %}">{{ t('view_recipe') }}</a>
-                </div>
+<div class="card-footer bg-transparent border-top-0">
+    <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-primary btn-sm btn-view" style="margin-left: 4px;">{{ t('view_recipe') }}</a>
+</div>
             </div>
         </div>
         {% endfor %}
