@@ -630,11 +630,11 @@ def about():
 
 @app.route("/impressum")
 def impressum():
-    return render_template('impressum.html')
+    return render_template('legal/impressum.html')
 
 @app.route("/privacy")
 def privacy():
-    return render_template('privacy.html')
+    return render_template('legal/privacy.html')
 
 @app.route("/")
 def home():

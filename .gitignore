@@ -33,5 +33,4 @@ start.sh
 *.rej
 *.swo
 *.swn
-templates/privacy.html
-templates/impressum.html
+templates/legal/
