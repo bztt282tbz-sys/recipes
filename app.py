@@ -1333,7 +1333,7 @@ if __name__ == '__main__':
             db.session.add(flour)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=flour.id, language='de', name='Mehl (Type 405)'))
-            db.session.add(IngredientTranslation(ingredient_id=flour.id, language='ru', name='Мука (Тип 405)'))
+            db.session.add(IngredientTranslation(ingredient_id=flour.id, language='ru', name='Мука (тип 405)'))
 
             cocoa = Ingredient(name='Cocoa Powder', language='en', density=0.4, density_unit='g/ml', creator_id=user.id)
             db.session.add(cocoa)
