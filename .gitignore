@@ -16,3 +16,4 @@ recipes_workspace.xcworkspace/
 *.egg-info/
 dist/
 build/
+notstart.sh
