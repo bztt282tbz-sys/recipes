@@ -306,24 +306,6 @@ class RecipeStep(db.Model):
     step_number = db.Column(db.Integer, nullable=False)
     instruction = db.Column(db.Text, nullable=False)
 
-class Tag(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False, index=True)
-    language = db.Column(db.String(10), nullable=False, index=True)
-    __table_args__ = (db.UniqueConstraint('name', 'language'),)
-    recipe_tags = db.relationship('RecipeTag', backref='tag', cascade="all, delete-orphan", lazy=True)
-
-    @property
-    def display_name(self):
-        return self.name
-
-class RecipeTag(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
-    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
-    recipe = db.relationship('Recipe', backref='tags')
-    __table_args__ = (db.UniqueConstraint('recipe_id', 'tag_id'),)
-
 class IngredientTranslation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ingredient_id = db.Column(db.Integer, db.ForeignKey('ingredient.id'), nullable=False)
@@ -331,13 +313,6 @@ class IngredientTranslation(db.Model):
     name = db.Column(db.String(50), nullable=False)
     __table_args__ = (db.UniqueConstraint('ingredient_id', 'language'),)
     ingredient = db.relationship('Ingredient', backref='translations')
-
-class IngredientTag(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    ingredient_id = db.Column(db.Integer, db.ForeignKey('ingredient.id'), nullable=False)
-    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
-    ingredient = db.relationship('Ingredient', backref='tags')
-    __table_args__ = (db.UniqueConstraint('ingredient_id', 'tag_id'),)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -625,28 +600,6 @@ def add_recipe():
         db.session.add(new_recipe)
         db.session.flush()
 
-        tag_ids_raw = request.form.get('tag_ids', '')
-        tag_ids = [t.strip() for t in tag_ids_raw.split(',') if t.strip()]
-        for tag_id in tag_ids:
-            if tag_id:
-                rt = RecipeTag(recipe_id=new_recipe.id, tag_id=int(tag_id))
-                db.session.add(rt)
-
-        new_tags = request.form.get('new_tags', '').strip()
-        if new_tags:
-            for tag_name in new_tags.split(','):
-                tag_name = tag_name.strip()
-                if tag_name:
-                    existing_tag = Tag.query.filter_by(name=tag_name, language=language).first()
-                    if not existing_tag:
-                        new_tag = Tag(name=tag_name, language=language)
-                        db.session.add(new_tag)
-                        db.session.flush()
-                        rt = RecipeTag(recipe_id=new_recipe.id, tag_id=new_tag.id)
-                    else:
-                        rt = RecipeTag(recipe_id=new_recipe.id, tag_id=existing_tag.id)
-                    db.session.add(rt)
-
         ing_ids = request.form.getlist('ing_id[]')
         amounts = request.form.getlist('amount[]')
         unit_ids = request.form.getlist('unit_id[]')
@@ -747,29 +700,6 @@ def edit_recipe(recipe_id):
                 return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
         recipe.portions = portions
 
-        RecipeTag.query.filter_by(recipe_id=recipe.id).delete()
-        tag_ids_raw = request.form.get('tag_ids', '')
-        tag_ids = [t.strip() for t in tag_ids_raw.split(',') if t.strip()]
-        for tag_id in tag_ids:
-            if tag_id:
-                rt = RecipeTag(recipe_id=recipe.id, tag_id=int(tag_id))
-                db.session.add(rt)
-
-        new_tags = request.form.get('new_tags', '').strip()
-        if new_tags:
-            for tag_name in new_tags.split(','):
-                tag_name = tag_name.strip()
-                if tag_name:
-                    existing_tag = Tag.query.filter_by(name=tag_name, language=recipe.language).first()
-                    if not existing_tag:
-                        new_tag = Tag(name=tag_name, language=recipe.language)
-                        db.session.add(new_tag)
-                        db.session.flush()
-                        rt = RecipeTag(recipe_id=recipe.id, tag_id=new_tag.id)
-                    else:
-                        rt = RecipeTag(recipe_id=recipe.id, tag_id=existing_tag.id)
-                    db.session.add(rt)
-
         RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
         RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
 
@@ -849,32 +779,6 @@ def get_units_for_ingredient(ingredient_id):
         else:
             available.append({'id': unit.id, 'name': unit.name, 'unit_type': unit.unit_type})
     return {'units': available}
-
-@app.route("/api/tags")
-def get_tags():
-    query = request.args.get('q', '')
-    lang = session.get('lang', 'en')
-    if query:
-        tags = Tag.query.filter(Tag.name.ilike(f'%{query}%'), Tag.language == lang).limit(10).all()
-    else:
-        tags = Tag.query.filter_by(language=lang).limit(20).all()
-    return {'tags': [{'id': t.id, 'name': t.name, 'language': t.language} for t in tags]}
-
-@app.route("/api/tags/create", methods=['POST'])
-@login_required
-def create_tag():
-    data = request.get_json()
-    name = data.get('name', '').strip()
-    lang = data.get('language', session.get('lang', 'en'))
-    if not name:
-        return {'error': 'Name required'}, 400
-    existing = Tag.query.filter_by(name=name, language=lang).first()
-    if existing:
-        return {'tag': {'id': existing.id, 'name': existing.name, 'language': existing.language}}
-    new_tag = Tag(name=name, language=lang)
-    db.session.add(new_tag)
-    db.session.commit()
-    return {'tag': {'id': new_tag.id, 'name': new_tag.name, 'language': new_tag.language}}
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -1078,28 +982,6 @@ def add_ingredient():
                         name=trans_name
                     )
                     db.session.add(new_trans)
-
-        tag_ids_raw = request.form.get('tag_ids', '')
-        tag_ids = [t.strip() for t in tag_ids_raw.split(',') if t.strip()]
-        for tag_id in tag_ids:
-            if tag_id:
-                it = IngredientTag(ingredient_id=new_ingredient.id, tag_id=int(tag_id))
-                db.session.add(it)
-
-        new_tags = request.form.get('new_tags', '').strip()
-        if new_tags:
-            for tag_name in new_tags.split(','):
-                tag_name = tag_name.strip()
-                if tag_name:
-                    existing_tag = Tag.query.filter_by(name=tag_name, language=language).first()
-                    if not existing_tag:
-                        new_tag = Tag(name=tag_name, language=language)
-                        db.session.add(new_tag)
-                        db.session.flush()
-                        it = IngredientTag(ingredient_id=new_ingredient.id, tag_id=new_tag.id)
-                    else:
-                        it = IngredientTag(ingredient_id=new_ingredient.id, tag_id=existing_tag.id)
-                    db.session.add(it)
 
         if density_type == 'g/unit' and unit_name:
             new_unit = Unit(
@@ -1392,27 +1274,6 @@ if __name__ == '__main__':
             tbsp_unit = Unit.query.filter_by(name='EL').first()
             tsp_unit = Unit.query.filter_by(name='TL').first()
 
-            tag_baking_en = Tag(name='Baking', language='en')
-            db.session.add(tag_baking_en)
-            db.session.flush()
-            tag_cake_en = Tag(name='Cake', language='en')
-            db.session.add(tag_cake_en)
-            db.session.flush()
-
-            tag_backen_de = Tag(name='Backen', language='de')
-            db.session.add(tag_backen_de)
-            db.session.flush()
-            tag_kuchen_de = Tag(name='Kuchen', language='de')
-            db.session.add(tag_kuchen_de)
-            db.session.flush()
-
-            tag_vyпечка_ru = Tag(name='Выпечка', language='ru')
-            db.session.add(tag_vyпечка_ru)
-            db.session.flush()
-            tag_tort_ru = Tag(name='Торт', language='ru')
-            db.session.add(tag_tort_ru)
-            db.session.flush()
-
             cake_group_id = str(uuid.uuid4())
 
             recipe_en = Recipe(
@@ -1439,9 +1300,6 @@ if __name__ == '__main__':
             db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=1, instruction='Preheat oven to 180°C (350°F) top/bottom heat (convection: 160°C/320°F). Grease a springform pan (Ø 20 cm) with a little oil. Mix flour with baking powder and cocoa powder.'))
             db.session.add(RecipeStep(recipe_id=recipe_en.id, step_number=2, instruction='Combine with the remaining ingredients and mix well. Pour batter into the springform pan. Bake in preheated oven for about 35 minutes. Test with a wooden skewer to see if done. Let cool completely.'))
 
-            db.session.add(RecipeTag(recipe_id=recipe_en.id, tag_id=tag_baking_en.id))
-            db.session.add(RecipeTag(recipe_id=recipe_en.id, tag_id=tag_cake_en.id))
-
             recipe_de = Recipe(
                 title='Schokoladenkuchen',
                 description='Ein saftiger Schokoladenkuchen mit Kakaopulver, gebacken in einer Springform (Ø 20 cm).',
@@ -1466,9 +1324,6 @@ if __name__ == '__main__':
             db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=1, instruction='Ofen auf 180°C (Ober-/Unterhitze, Umluft: 160°C) vorheizen. Eine Springform (Ø 20 cm) mit etwas Öl einfetten. Mehl mit Backpulver und Kakaopulver mischen.'))
             db.session.add(RecipeStep(recipe_id=recipe_de.id, step_number=2, instruction='Mit den restlichen Zutaten gut vermischen. Teig in die Springform füllen. Im vorgeheizten Ofen ca. 35 Minuten backen. Mit einem Holzstäbchen testen. Vollständig abkühlen lassen.'))
 
-            db.session.add(RecipeTag(recipe_id=recipe_de.id, tag_id=tag_backen_de.id))
-            db.session.add(RecipeTag(recipe_id=recipe_de.id, tag_id=tag_kuchen_de.id))
-
             recipe_ru = Recipe(
                 title='Шоколадный торт',
                 description='Влажный шоколадный торт с какао-порошком, выпеченный в разъёмной форме (Ø 20 см).',
@@ -1492,9 +1347,6 @@ if __name__ == '__main__':
 
             db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=1, instruction='Разогрейте духовку до 180°C (верхний/нижний жар, конвекция: 160°C). Смажьте разъёмную форму (Ø 20 см) небольшим количеством масла. Смешайте муку с разрыхлителем и какао-порошком.'))
             db.session.add(RecipeStep(recipe_id=recipe_ru.id, step_number=2, instruction='Смешайте с оставшимися ингредиентами до однородности. Вылейте тесто в форму. Выпекайте в духовке около 35 минут. Проверьте деревянной шпажкой. Полностью остудите.'))
-
-            db.session.add(RecipeTag(recipe_id=recipe_ru.id, tag_id=tag_vyпечка_ru.id))
-            db.session.add(RecipeTag(recipe_id=recipe_ru.id, tag_id=tag_tort_ru.id))
 
             db.session.commit()
 
