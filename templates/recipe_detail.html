@@ -282,8 +282,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePortionsDisplay(newPortions) {
         var multiplier = newPortions / basePortions;
         currentMultiplier = multiplier;
-        var display = document.querySelector('.portions-display');
-        if (display) display.textContent = Math.round(newPortions * 100) / 100;
+        document.querySelectorAll('.portions-display').forEach(function(display) {
+            if (display) display.textContent = Math.round(newPortions * 100) / 100;
+        });
 
         document.querySelectorAll('.portions-btn[data-action="decrease"]').forEach(function(btn) {
             btn.disabled = newPortions <= 0.25;
@@ -298,6 +299,13 @@ document.addEventListener('DOMContentLoaded', function() {
             var originalUnit = badge.dataset.originalUnit;
             var totalGrams = originalAmount * originalUnitGrams * multiplier;
             badge.textContent = Math.round((totalGrams / originalUnitGrams) * 100) / 100 + ' ' + originalUnit;
+        });
+        document.querySelectorAll('.dropdown-menu .dropdown-item').forEach(function(item) {
+            if (item.dataset.unitId === 'original') {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
         });
     }
 
@@ -323,9 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const badge = menu.parentElement.querySelector('.badge');
             const ingId = badge.dataset.ingId;
 
-            const originalAmount = parseFloat(badge.dataset.originalAmount);
-            const originalUnitGrams = parseFloat(badge.dataset.originalUnitGrams) || 1;
-            const originalUnit = badge.dataset.originalUnit;
             const densityUnit = badge.dataset.densityUnit;
             const density = parseFloat(badge.dataset.density) || 1.0;
             const gramsPerUnit = parseFloat(badge.dataset.gramsPerUnit);
@@ -335,31 +340,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const unitType = this.dataset.unitType;
             const gramsConv = parseFloat(this.dataset.grams);
 
-            const totalGrams = originalAmount * originalUnitGrams * currentMultiplier;
+            document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                const bOriginalAmount = parseFloat(b.dataset.originalAmount);
+                const bOriginalUnitGrams = parseFloat(b.dataset.originalUnitGrams) || 1;
+                const bOriginalUnit = b.dataset.originalUnit;
+                const bTotalGrams = bOriginalAmount * bOriginalUnitGrams * currentMultiplier;
 
-            if (unitId === 'original') {
-                document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
-                    const bOriginalAmount = parseFloat(b.dataset.originalAmount) * currentMultiplier;
-                    const bOriginalUnit = b.dataset.originalUnit;
-                    b.textContent = Math.round(bOriginalAmount * 100) / 100 + ' ' + bOriginalUnit;
-                });
-            } else {
-                document.querySelectorAll('.badge[data-ing-id="' + ingId + '"]').forEach(function(b) {
+                if (unitId === 'original') {
+                    b.textContent = Math.round(bOriginalAmount * currentMultiplier * 100) / 100 + ' ' + bOriginalUnit;
+                } else {
                     let displayAmount;
                     if (unitType === 'mass') {
-                        displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
+                        displayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
                     } else if (unitType === 'volume') {
                         if (densityUnit === 'g/unit' && gramsPerUnit) {
-                            displayAmount = Math.round(totalGrams / gramsPerUnit * 100) / 100;
+                            displayAmount = Math.round(bTotalGrams / gramsPerUnit * 100) / 100;
                         } else {
-                            displayAmount = Math.round(totalGrams / gramsConv / density * 100) / 100;
+                            displayAmount = Math.round(bTotalGrams / gramsConv / density * 100) / 100;
                         }
                     } else {
-                        displayAmount = Math.round(totalGrams / gramsConv * 100) / 100;
+                        displayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
                     }
                     b.textContent = displayAmount + ' ' + unitName;
-                });
-            }
+                }
+            });
 
             document.querySelectorAll('.dropdown-menu').forEach(function(m) {
                 m.querySelectorAll('.dropdown-item').forEach(function(i) {
