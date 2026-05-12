@@ -8,14 +8,20 @@ An open-source, multilingual recipe manager. Organize, discover, and share your 
 - **Drafts** — save recipes as drafts, visible only to you
 - **Multi-language recipes** — link translations of the same dish (e.g. "Chocolate Cake" / "Schokoladenkuchen")
 - **Multi-language UI** — English, German, and Russian interface
+- **Multi-language ingredients** — name ingredients in multiple languages with fallback chains
 - **Step-by-step instructions** — each step has its own set of ingredients
 - **Portion scaling** — dynamically scale ingredient quantities up/down
-- **Smart unit conversion** — convert between grams, cups, mL, etc. per ingredient
+- **Smart unit conversion** — convert between grams, cups, mL, etc. per ingredient (density-aware)
+- **Bound units** — bind units to specific ingredients with per-ingredient gram overrides
 - **Ingredient & unit management** — create custom ingredients and units with density-aware conversion
-- **Full-text search** — search recipes by title
+- **Tags & filtering** — tag recipes and filter by tags on the home page
+- **Shopping cart** — add recipes with custom portions, view aggregated ingredients, copy to clipboard
+- **Work & cooking time** — track preparation and cooking time per recipe
+- **Full-text search** — search recipes by title, filter by tags
 - **Download as Markdown** — export any recipe as a `.md` file
-- **User accounts** — register, log in, change settings
-- **Admin panel** — manage users, add demo data
+- **Interactive onboarding** — first-visit guided tour with live demos
+- **User accounts** — register, log in, change settings (username, password)
+- **Admin panel** — manage users (promote/demote, pause, delete), add demo data
 - **Rate-limited & secure** — CSRF protection, bcrypt passwords, security headers
 
 ## Tech Stack

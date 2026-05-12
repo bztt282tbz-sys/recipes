@@ -318,6 +318,28 @@
             </div>
 
             <div class="onboarding-slide text-center" data-slide="6">
+                <div class="onboarding-icon" style="background:#fff3cd;color:#e6a700;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M3 2v4.586l7 7L14.586 9l-7-7H3zM2 2a1 1 0 0 1 1-1h4.586a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-4.586 4.586a1 1 0 0 1-1.414 0l-7-7A1 1 0 0 1 2 6.586V2z"/><path d="M5.5 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+                </div>
+                <h4 class="mb-2">{{ t('onboard_tags_heading') }} <span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem;vertical-align:middle;">NEW</span></h4>
+                <p class="text-muted mb-4">{{ t('onboard_tags') }}</p>
+                <div class="demo-card text-start" id="demo-tags">
+                    <div class="fw-medium mb-2 text-center" style="font-size:0.9rem;">{{ t('tour_olive_oil') }}</div>
+                    <div class="d-flex justify-content-center gap-1 mb-3">
+                        <span class="badge bg-info" style="font-size:0.7rem;">Italian</span>
+                        <span class="badge bg-info" style="font-size:0.7rem;">Quick</span>
+                        <span class="badge bg-info" style="font-size:0.7rem;">Dinner</span>
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-center gap-1">
+                        <a href="#" class="btn btn-sm btn-outline-secondary rounded-pill" style="font-size:0.75rem;">Italian</a>
+                        <a href="#" class="btn btn-sm btn-info rounded-pill" style="font-size:0.75rem;">Quick</a>
+                        <a href="#" class="btn btn-sm btn-outline-secondary rounded-pill" style="font-size:0.75rem;">Dinner</a>
+                        <a href="#" class="btn btn-sm btn-outline-secondary rounded-pill" style="font-size:0.75rem;">Dessert</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="onboarding-slide text-center" data-slide="7">
                 <div class="onboarding-icon" style="background:#e8f4fd;color:#3498db;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
                 </div>
@@ -325,7 +347,46 @@
                 <p class="text-muted mb-4">{{ t('onboard_export') }}</p>
             </div>
 
-            <div class="onboarding-slide text-center" data-slide="7">
+            <div class="onboarding-slide text-center" data-slide="8">
+                <div class="onboarding-icon" style="background:#d4edda;color:#28a745;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l1.313 7h8.17l1.313-7H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                </div>
+                <h4 class="mb-2">{{ t('onboard_cart_heading') }} <span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem;vertical-align:middle;">NEW</span></h4>
+                <p class="text-muted mb-4">{{ t('onboard_cart') }}</p>
+                <div class="demo-card text-start" id="demo-cart">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-medium" style="font-size:0.85rem;">{{ t('tour_chocolate_cake') }} <span class="text-muted fw-normal">x4</span></span>
+                        <span class="badge bg-danger" style="font-size:0.6rem;">{{ t('remove_from_cart') }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-medium" style="font-size:0.85rem;">{{ t('tour_olive_oil') }} <span class="text-muted fw-normal">x2</span></span>
+                        <span class="badge bg-danger" style="font-size:0.6rem;">{{ t('remove_from_cart') }}</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold small">{{ t('aggregated') }}</span>
+                        <span class="text-end">
+                            <button class="btn btn-primary btn-sm">{{ t('copy_to_clipboard') }}</button>
+                        </span>
+                    </div>
+                    <div class="mt-2 small">
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                            <span>{{ t('tour_flour') }}</span>
+                            <span>750 {{ t('g_abbr') }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom">
+                            <span>{{ t('tour_sugar') }}</span>
+                            <span>360 {{ t('g_abbr') }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1">
+                            <span>{{ t('tour_eggs') }}</span>
+                            <span>6</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="onboarding-slide text-center" data-slide="9">
                 <div class="onboarding-icon" style="background:#d4edda;color:#27ae60;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
                 </div>
@@ -344,7 +405,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
     <script>
     var onboardingSlide = 0;
-    var onboardingTotal = 8;
+    var onboardingTotal = 10;
     var demoTimeouts = [];
 
     function clearDemoTimeouts() {
@@ -460,6 +521,29 @@
         }, 3500));
     }
 
+    function runTagsDemo() {
+        var tagBtns = document.querySelectorAll('#demo-tags .btn-outline-secondary');
+        if (!tagBtns.length) return;
+        demoTimeouts.push(setTimeout(function() {
+            tagBtns.forEach(function(b, i) {
+                setTimeout(function() {
+                    b.className = 'btn btn-sm btn-info rounded-pill';
+                }, i * 400);
+            });
+        }, 600));
+    }
+
+    function runCartDemo() {
+        var removeBtns = document.querySelectorAll('#demo-cart .badge.bg-danger');
+        if (!removeBtns.length) return;
+        demoTimeouts.push(setTimeout(function() {
+            removeBtns[0].style.opacity = '0.5';
+        }, 800));
+        demoTimeouts.push(setTimeout(function() {
+            removeBtns[0].style.opacity = '1';
+        }, 1400));
+    }
+
     function showSlide(n) {
         clearDemoTimeouts();
         document.querySelectorAll('.onboarding-slide').forEach(function(s) { s.classList.remove('active'); });
@@ -480,6 +564,8 @@
         if (n === 2) resetPortionsDemo();
         if (n === 4) { var wb = document.getElementById('demo-water-breakdown'); if (wb) wb.style.display = 'none'; runStepsDemo(); }
         if (n === 5) runCustomDemo();
+        if (n === 6) runTagsDemo();
+        if (n === 8) runCartDemo();
     }
 
     function nextSlide() {
