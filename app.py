@@ -1761,6 +1761,7 @@ def cart_copy():
         if sel and sel.get('unit_id') and sel['unit_id'] != 'original':
             unit_id = sel['unit_id']
             unit_name = sel.get('unit_name', 'g')
+            is_bound = sel.get('is_bound', False)
             unit_type = sel.get('unit_type', 'mass')
             grams_conv = float(sel.get('grams_conversion', 1))
             density = data['density']
@@ -1775,11 +1776,12 @@ def cart_copy():
                     display_amount = round(total_g / grams_conv / density, 1)
             else:
                 display_amount = round(total_g / grams_conv, 1)
+            unit_display = f" {unit_name}" if is_bound else unit_name
         else:
             display_amount = round(total_g, 1)
-            unit_name = 'g'
+            unit_display = 'g'
         amount_str = str(int(display_amount)) if display_amount == int(display_amount) else str(display_amount)
-        result_lines.append(f"• {amount_str} {unit_name} {data['name']}")
+        result_lines.append(f"• {amount_str}{unit_display} {data['name']}")
 
     text = '\n'.join(result_lines) if result_lines else '—'
     return jsonify({'text': text})

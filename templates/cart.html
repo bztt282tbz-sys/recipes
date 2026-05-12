@@ -130,7 +130,7 @@
                                     <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ing.display_unit }} ({{ t('original') }})</a></li>
                                     {% for unit in ing.available_units %}
                                     {% if translate_unit(unit) != ing.display_unit %}
-                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
+                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}" data-unit-bound="{{ unit.is_bound }}">{{ translate_unit(unit) }}</a></li>
                                     {% endif %}
                                     {% endfor %}
                                 </ul>
@@ -174,7 +174,7 @@
                                                 <li><a class="dropdown-item active" href="#" data-unit-id="original">{% if lang == 'ru' %}г{% else %}g{% endif %} ({{ t('original') }})</a></li>
                                                 {% for unit in agg.available_units %}
                                                 {% if translate_unit(unit) != (lang == 'ru' and 'г' or 'g') %}
-                                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
+                                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}" data-unit-bound="{{ unit.is_bound }}">{{ translate_unit(unit) }}</a></li>
                                                 {% endif %}
                                                 {% endfor %}
                                             </ul>
@@ -230,7 +230,8 @@ document.getElementById('copy-btn')?.addEventListener('click', function() {
             unit_id: b.dataset.selectedUnitId,
             unit_name: b.dataset.selectedUnitName,
             unit_type: b.dataset.selectedUnitType,
-            grams_conversion: b.dataset.selectedUnitGrams
+            grams_conversion: b.dataset.selectedUnitGrams,
+            is_bound: b.dataset.selectedUnitBound === 'True'
         };
     });
     var formData = new FormData();
@@ -308,6 +309,7 @@ document.querySelectorAll('.cart-unit-badge').forEach(function(badge) {
                 b.dataset.selectedUnitName = unitName;
                 b.dataset.selectedUnitType = unitType;
                 b.dataset.selectedUnitGrams = gramsConv;
+                b.dataset.selectedUnitBound = this.dataset.unitBound || 'False';
             }
 
             menu.querySelectorAll('.dropdown-item').forEach(function(i) { i.classList.remove('active'); });
