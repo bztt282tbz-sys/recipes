@@ -44,7 +44,11 @@
         transform: translateY(-5px);
         box-shadow: 0 12px 30px rgba(0,0,0,0.1) !important;
     }
-    .recipe-card .card-body { padding: 1.5rem; }
+    .recipe-card .card-body {
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+    }
     .recipe-card .card-title {
         font-family: 'Playfair Display', serif;
         font-size: 1.25rem;
@@ -52,6 +56,7 @@
         margin-bottom: 0.75rem;
     }
     .recipe-card .card-text {
+        flex-grow: 1;
         color: #7f8c8d;
         font-size: 0.9rem;
         line-height: 1.6;
