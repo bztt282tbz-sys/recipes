@@ -28,6 +28,13 @@
                     {% endfor %}
                 </div>
                 {% endif %}
+                {% if recipe.work_time or recipe.cooking_time %}
+                <div class="mb-3 d-flex flex-wrap gap-3 text-muted small">
+                    {% if recipe.work_time %}<span>🕐 {{ t('work_time') }}: {{ fmt_minutes(recipe.work_time) }}</span>{% endif %}
+                    {% if recipe.cooking_time %}<span>🔥 {{ t('cooking_time') }}: {{ fmt_minutes(recipe.cooking_time) }}</span>{% endif %}
+                    {% if recipe.work_time and recipe.cooking_time %}<span class="fw-semibold">⏱ {{ t('total_time') }}: {{ fmt_minutes(recipe.work_time + recipe.cooking_time) }}</span>{% endif %}
+                </div>
+                {% endif %}
                 {% if recipe.instructions %}
                 <hr>
                 <h4>{{ t('notes') }}</h4>

@@ -205,6 +205,8 @@ class Recipe(db.Model):
     language = db.Column(db.String(10), default='en')
     is_draft = db.Column(db.Boolean, default=True)
     portions = db.Column(db.Float, default=1)
+    work_time = db.Column(db.Integer, nullable=True)
+    cooking_time = db.Column(db.Integer, nullable=True)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     group_id = db.Column(db.String(36), nullable=True, index=True)
     recipe_ingredients = db.relationship('RecipeIngredient', backref='recipe', cascade="all, delete-orphan", lazy=True)
@@ -429,6 +431,7 @@ def inject_translations():
             'shopping_cart': 'Shopping Cart', 'add_to_cart': 'Add to Cart', 'remove_from_cart': 'Remove',
             'cart_empty': 'Your shopping cart is empty.',
             'per_recipe': 'Per Recipe', 'aggregated': 'All Ingredients Combined', 'cart_items': 'Recipes in Cart',
+            'work_time': 'Work time', 'cooking_time': 'Cooking time', 'total_time': 'Total time',
             'skip': 'Skip', 'take_tour': 'Take the Tour', 'next': 'Next', 'choose_language': 'Choose your language:',
             'tour_done': "You're all set!", 'tour_done_subtitle': 'Start exploring, add your first recipe, or browse what others have shared.',
             'get_started': 'Get Started',
@@ -525,6 +528,7 @@ def inject_translations():
             'shopping_cart': 'Einkaufswagen', 'add_to_cart': 'In den Warenkorb', 'remove_from_cart': 'Entfernen',
             'cart_empty': 'Ihr Einkaufswagen ist leer.',
             'per_recipe': 'Pro Rezept', 'aggregated': 'Alle Zutaten kombiniert', 'cart_items': 'Rezepte im Warenkorb',
+            'work_time': 'Arbeitszeit', 'cooking_time': 'Garzeit', 'total_time': 'Gesamtzeit',
             'skip': 'Überspringen', 'take_tour': 'Tour starten', 'next': 'Weiter', 'choose_language': 'Wählen Sie Ihre Sprache:',
             'tour_done': 'Bereit!', 'tour_done_subtitle': 'Erkunden Sie die App, erstellen Sie Ihr erstes Rezept oder stöbern Sie in den Rezepten anderer.',
             'get_started': 'Loslegen',
@@ -621,6 +625,7 @@ def inject_translations():
             'shopping_cart': 'Корзина', 'add_to_cart': 'В корзину', 'remove_from_cart': 'Удалить',
             'cart_empty': 'Ваша корзина пуста.',
             'per_recipe': 'На рецепт', 'aggregated': 'Все ингредиенты вместе', 'cart_items': 'Рецепты в корзине',
+            'work_time': 'Время работы', 'cooking_time': 'Время приготовления', 'total_time': 'Общее время',
             'skip': 'Пропустить', 'take_tour': 'Начать тур', 'next': 'Далее', 'choose_language': 'Выберите язык:',
             'tour_done': 'Всё готово!', 'tour_done_subtitle': 'Начинайте исследовать, добавьте первый рецепт или посмотрите, что создали другие.',
             'get_started': 'Начать',
@@ -711,6 +716,16 @@ def inject_translations():
         except (ValueError, TypeError):
             return str(amount)
 
+    def fmt_minutes(minutes):
+        if minutes is None:
+            return ''
+        m = int(minutes)
+        h = m // 60
+        rem = m % 60
+        if h > 0:
+            return f'{h}h {rem}min' if rem else f'{h}h'
+        return f'{m}min'
+
     return dict(
         t=lambda key: translations_dict.get(current_lang, translations_dict['en']).get(key, key),
         lang=current_lang,
@@ -720,6 +735,7 @@ def inject_translations():
         translate_tag=translate_tag_name,
         get_unit_name=get_unit_name,
         fmt_amount=fmt_amount,
+        fmt_minutes=fmt_minutes,
         request=request
     )
 
@@ -738,7 +754,8 @@ def privacy():
 @app.route("/")
 def home():
     search_query = request.args.get('q', '')
-    tag_filter = request.args.get('tag', '').strip()
+    tag_filters = request.args.getlist('tag')
+    tag_filters = [t.strip() for t in tag_filters if t.strip()]
     current_lang = session.get('lang', 'en')
 
     if current_user.is_authenticated:
@@ -752,26 +769,27 @@ def home():
     if search_query:
         query = query.filter(Recipe.title.ilike(f'%{search_query}%'))
 
-    if tag_filter:
-        tag_obj = Tag.query.filter_by(name=tag_filter).first()
-        if tag_obj:
-            rts = RecipeTag.query.filter_by(tag_id=tag_obj.id).all()
-            recipe_ids = set()
-            group_ids = set()
-            for rt in rts:
-                if rt.recipe_id:
-                    recipe_ids.add(rt.recipe_id)
-                if rt.group_id:
-                    group_ids.add(rt.group_id)
-            if recipe_ids or group_ids:
-                filters = []
-                if recipe_ids:
-                    filters.append(Recipe.id.in_(recipe_ids))
-                if group_ids:
-                    filters.append(Recipe.group_id.in_(group_ids))
-                query = query.filter(or_(*filters))
-            else:
-                query = query.filter(Recipe.id < 0)
+    if tag_filters:
+        recipe_ids_for_tags = set()
+        group_ids_for_tags = set()
+        for tag_name in tag_filters:
+            tag_obj = Tag.query.filter_by(name=tag_name).first()
+            if tag_obj:
+                rts = RecipeTag.query.filter_by(tag_id=tag_obj.id).all()
+                for rt in rts:
+                    if rt.recipe_id:
+                        recipe_ids_for_tags.add(rt.recipe_id)
+                    if rt.group_id:
+                        group_ids_for_tags.add(rt.group_id)
+        filters = []
+        if recipe_ids_for_tags:
+            filters.append(Recipe.id.in_(recipe_ids_for_tags))
+        if group_ids_for_tags:
+            filters.append(Recipe.group_id.in_(group_ids_for_tags))
+        if filters:
+            query = query.filter(or_(*filters))
+        else:
+            query = query.filter(Recipe.id < 0)
 
     recipes_by_group = {}
     standalone_recipes = []
@@ -840,7 +858,7 @@ def home():
     tag_ids = [t[0] for t in tag_ids if t[0]]
     all_tags = Tag.query.filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
 
-    return render_template('home.html', recipes=primary_recipes + primary_grouped, secondary_recipes=secondary_recipes, search_query=search_query, tag_filter=tag_filter, all_tags=all_tags)
+    return render_template('home.html', recipes=primary_recipes + primary_grouped, secondary_recipes=secondary_recipes, search_query=search_query, tag_filters=tag_filters, all_tags=all_tags)
 
 @app.route("/recipe/<int:recipe_id>")
 def recipe_detail(recipe_id):
@@ -877,6 +895,8 @@ def add_recipe():
                 return render_template('add_recipe.html', all_ingredients=all_ingredients, all_units=all_units)
 
         language = request.form.get('language', session.get('lang', 'en'))
+        work_time = request.form.get('work_time', type=int)
+        cooking_time = request.form.get('cooking_time', type=int)
 
         new_recipe = Recipe(
             title=title,
@@ -884,6 +904,8 @@ def add_recipe():
             instructions=instructions,
             is_draft=is_draft,
             portions=portions,
+            work_time=work_time,
+            cooking_time=cooking_time,
             language=language,
             creator_id=current_user.id
         )
@@ -966,6 +988,8 @@ def edit_recipe(recipe_id):
         recipe.instructions = request.form.get('instructions', '').strip()
         recipe.is_draft = True if request.form.get('is_draft') else False
         recipe.language = request.form.get('language', recipe.language)
+        recipe.work_time = request.form.get('work_time', type=int)
+        recipe.cooking_time = request.form.get('cooking_time', type=int)
 
         new_group_id = request.form.get('group_id')
         if new_group_id == '__new_group__':
@@ -1926,6 +1950,17 @@ def create_demo_recipe():
 
 def init_db():
     with app.app_context():
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('recipe')]
+        if 'work_time' not in columns:
+            db.session.execute(text("ALTER TABLE recipe ADD COLUMN work_time INTEGER"))
+        if 'cooking_time' not in columns:
+            db.session.execute(text("ALTER TABLE recipe ADD COLUMN cooking_time INTEGER"))
+        db.session.commit()
+        
+        db.create_all()
+
         db.create_all()
 
         user = User.query.first()

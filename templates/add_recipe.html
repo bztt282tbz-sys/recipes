@@ -30,6 +30,16 @@
                             <option value="ru" {% if lang=='ru' %}selected{% endif %}>Russian</option>
                         </select>
                     </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ t('work_time') }} (min)</label>
+                            <input type="number" name="work_time" class="form-control" placeholder="e.g. 30" min="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ t('cooking_time') }} (min)</label>
+                            <input type="number" name="cooking_time" class="form-control" placeholder="e.g. 45" min="0">
+                        </div>
+                    </div>
 
                     <hr>
                     <h5>{{ t('instructions') }}</h5>

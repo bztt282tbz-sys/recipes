@@ -30,6 +30,16 @@
                             <option value="ru" {% if recipe.language=='ru' %}selected{% endif %}>Russian</option>
                         </select>
                     </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ t('work_time') }} (min)</label>
+                            <input type="number" name="work_time" class="form-control" value="{{ recipe.work_time or '' }}" placeholder="e.g. 30" min="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ t('cooking_time') }} (min)</label>
+                            <input type="number" name="cooking_time" class="form-control" value="{{ recipe.cooking_time or '' }}" placeholder="e.g. 45" min="0">
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Recipe Group</label>
                         <div class="input-group">

@@ -150,11 +150,17 @@
     {% if all_tags %}
     <div class="mt-3 d-flex flex-wrap justify-content-center gap-1">
         {% for tag in all_tags %}
-        <a href="{{ url_for('home', tag=tag.name, q=search_query) }}" class="btn btn-sm {% if tag_filter == tag.name %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-pill">
+        {% set is_active = tag.name in tag_filters %}
+        {% if is_active %}
+        {% set new_tags = tag_filters | reject("equalto", tag.name) | list %}
+        {% else %}
+        {% set new_tags = tag_filters + [tag.name] %}
+        {% endif %}
+        <a href="{{ url_for('home', tag=new_tags if new_tags else None, q=search_query) }}" class="btn btn-sm {% if is_active %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-pill">
             {{ translate_tag(tag) }}
         </a>
         {% endfor %}
-        {% if tag_filter %}
+        {% if tag_filters %}
         <a href="{{ url_for('home', q=search_query) }}" class="btn btn-sm btn-outline-danger rounded-pill">✕</a>
         {% endif %}
     </div>
@@ -191,6 +197,12 @@
                     {% for tag in recipe._tags %}
                     <span class="badge bg-info me-1" style="font-size:0.7rem;">{{ translate_tag(tag) }}</span>
                     {% endfor %}
+                </div>
+                {% endif %}
+                {% if recipe.work_time or recipe.cooking_time %}
+                <div class="mb-2 small text-muted">
+                    {% if recipe.work_time %}<span class="me-2">🕐 {{ fmt_minutes(recipe.work_time) }}</span>{% endif %}
+                    {% if recipe.cooking_time %}<span>🔥 {{ fmt_minutes(recipe.cooking_time) }}</span>{% endif %}
                 </div>
                 {% endif %}
                 <div class="recipe-meta">
