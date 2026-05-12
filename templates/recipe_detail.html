@@ -77,13 +77,13 @@
                             </a>
                             <div class="dropdown">
                                 <span class="badge bg-primary rounded-pill badge-clickable portions-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ agg.total_grams }}" data-original-amount="{{ agg.total_amount }}" data-original-unit="{{ agg.display_unit }}" data-original-unit-grams="{{ agg.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                    {{ agg.total_amount }} {{ agg.display_unit }}
+                                    {{ fmt_amount(agg.total_amount) }} {{ agg.display_unit }}
                                 </span>
                                 <ul class="dropdown-menu dropdown-menu-end" id="unit-menu-mobile-{{ agg.ingredient.id }}">
                                     <li><h6 class="dropdown-header">{{ t('convert_to') }}</h6></li>
                                     <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ agg.display_unit }} ({{ t('original') }})</a></li>
                                     {% for unit in agg.available_units %}
-                                    {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                    {% if translate_unit(unit) != agg.display_unit and (agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume') %}
                                     <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
                                     {% endif %}
                                     {% endfor %}
@@ -98,12 +98,12 @@
                                     <span>{{ t('step') }} {{ step.step_number }}: </span>
                                     <div class="dropdown d-inline">
                                         <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ step.grams }}" data-original-amount="{{ step.amount }}" data-original-unit="{{ step.display_unit }}" data-original-unit-grams="{{ step.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                            {{ step.amount }} {{ step.display_unit }}
+                                            {{ fmt_amount(step.amount) }} {{ step.display_unit }}
                                         </span>
                                         <ul class="dropdown-menu dropdown-menu-end">
                                             <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ step.display_unit }} ({{ t('original') }})</a></li>
                                             {% for unit in step.available_units %}
-                                            {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                            {% if translate_unit(unit) != step.display_unit and (agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume') %}
                                             <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
                                             {% endif %}
                                             {% endfor %}
@@ -143,22 +143,22 @@
                             {% set unit_grams = ri.unit.grams_conversion %}
                         {% endif %}
                     {% endif %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ translate_ing(ri.ingredient) }}
-                        <div class="dropdown">
-                            <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ ri.ingredient.id }}" data-total-grams="{{ ri.amount_grams }}" data-original-amount="{{ ri.amount }}" data-original-unit="{{ ri.display_unit }}" data-original-unit-grams="{{ unit_grams }}" data-density="{{ ri.ingredient.density or '' }}" data-density-unit="{{ ri.ingredient.density_unit or '' }}" data-grams-per-unit="{{ ri.ingredient.grams_per_unit or '' }}">
-                                {{ ri.amount }} {{ ri.display_unit }}
-                            </span>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ri.display_unit }} ({{ t('original') }})</a></li>
-                                {% for unit in ing_units %}
-                                {% if ri.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
-                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
-                                {% endif %}
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ translate_ing(ri.ingredient) }}
+                                        <div class="dropdown">
+                                            <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ ri.ingredient.id }}" data-total-grams="{{ ri.amount_grams }}" data-original-amount="{{ ri.amount }}" data-original-unit="{{ ri.display_unit }}" data-original-unit-grams="{{ unit_grams }}" data-density="{{ ri.ingredient.density or '' }}" data-density-unit="{{ ri.ingredient.density_unit or '' }}" data-grams-per-unit="{{ ri.ingredient.grams_per_unit or '' }}">
+                                                {{ fmt_amount(ri.amount) }} {{ ri.display_unit }}
+                                            </span>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ri.display_unit }} ({{ t('original') }})</a></li>
+                                                {% for unit in ing_units %}
+                                                {% if translate_unit(unit) != ri.display_unit and (ri.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume') %}
+                                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </li>
                     {% endfor %}
                 </ul>
                 {% endif %}
@@ -210,13 +210,13 @@
                             </a>
                             <div class="dropdown">
                                 <span class="badge bg-primary rounded-pill badge-clickable portions-badge" data-bs-toggle="dropdown" aria-expanded="false" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ agg.total_grams }}" data-original-amount="{{ agg.total_amount }}" data-original-unit="{{ agg.display_unit }}" data-original-unit-grams="{{ agg.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                    {{ agg.total_amount }} {{ agg.display_unit }}
+                                    {{ fmt_amount(agg.total_amount) }} {{ agg.display_unit }}
                                 </span>
                                 <ul class="dropdown-menu dropdown-menu-end" id="unit-menu-{{ agg.ingredient.id }}">
                                     <li><h6 class="dropdown-header">{{ t('convert_to') }}</h6></li>
                                     <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ agg.display_unit }} ({{ t('original') }})</a></li>
                                     {% for unit in agg.available_units %}
-                                    {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                    {% if translate_unit(unit) != agg.display_unit and (agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume') %}
                                     <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
                                     {% endif %}
                                     {% endfor %}
@@ -231,12 +231,12 @@
                                     <span>{{ t('step') }} {{ step.step_number }}: </span>
                                     <div class="dropdown d-inline">
                                         <span class="badge bg-secondary rounded-pill badge-clickable step-badge" data-bs-toggle="dropdown" data-ing-id="{{ agg.ingredient.id }}" data-total-grams="{{ step.grams }}" data-original-amount="{{ step.amount }}" data-original-unit="{{ step.display_unit }}" data-original-unit-grams="{{ step.original_unit_grams }}" data-density="{{ agg.ingredient.density or '' }}" data-density-unit="{{ agg.ingredient.density_unit or '' }}" data-grams-per-unit="{{ agg.ingredient.grams_per_unit or '' }}">
-                                            {{ step.amount }} {{ step.display_unit }}
+                                            {{ fmt_amount(step.amount) }} {{ step.display_unit }}
                                         </span>
                                         <ul class="dropdown-menu dropdown-menu-end">
                                             <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ step.display_unit }} ({{ t('original') }})</a></li>
                                             {% for unit in step.available_units %}
-                                            {% if agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume' %}
+                                            {% if translate_unit(unit) != step.display_unit and (agg.ingredient.density_unit != 'g/unit' or unit.unit_type != 'volume') %}
                                             <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
                                             {% endif %}
                                             {% endfor %}
@@ -260,7 +260,15 @@
                 {% if current_user.is_authenticated and (recipe.creator_id == current_user.id or current_user.is_admin) %}
                     <a href="{{ url_for('edit_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm me-2">{{ t('edit_recipe') }}</a>
                 {% endif %}
-                <a href="{{ url_for('print_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm">{{ t('download') }}</a>
+                <a href="{{ url_for('print_recipe', recipe_id=recipe.id) }}" class="btn btn-outline-primary btn-sm me-2">{{ t('download') }}</a>
+                <hr>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label class="small text-muted mb-0">{{ t('portions') }}:</label>
+                    <input type="number" id="cart-portions" class="form-control form-control-sm" value="{{ recipe.portions or 4 }}" min="0.5" step="0.5" style="width:70px;">
+                    <button class="btn btn-success btn-sm" id="add-to-cart-btn">{{ t('add_to_cart') }}</button>
+                </div>
+                <div id="cart-feedback" class="small text-success mt-1" style="display:none;"></div>
             </div>
         </div>
         </div>
@@ -271,6 +279,28 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('add-to-cart-btn')?.addEventListener('click', function() {
+        var recipeId = {{ recipe.id }};
+        var portions = document.getElementById('cart-portions').value;
+        var formData = new FormData();
+        formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+        formData.append('recipe_id', recipeId);
+        formData.append('portions', portions);
+        fetch('/api/cart/add', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.success) {
+                var fb = document.getElementById('cart-feedback');
+                fb.textContent = 'Added! (' + data.count + ' in cart)';
+                fb.style.display = 'block';
+                setTimeout(function() { fb.style.display = 'none'; }, 2000);
+                // Update navbar badge
+                if (typeof updateCartBadge === 'function') updateCartBadge();
+            }
+        });
+    });
+
     var basePortions = parseFloat(document.getElementById('base-portions')?.value || 1);
     var currentMultiplier = 1;
 

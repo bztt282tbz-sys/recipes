@@ -175,10 +175,10 @@ class Ingredient(db.Model):
             if unit.is_bound:
                 for ui in unit.ingredient_units:
                     if ui.ingredient_id == self.id:
-                        available.append({'id': unit.id, 'name': unit.name, 'unit_type': unit.unit_type, 'grams_conversion': unit.grams_conversion, 'is_bound': True})
+                        available.append({'id': unit.id, 'name': unit.name, 'name_ru': unit.name_ru, 'unit_type': unit.unit_type, 'grams_conversion': unit.grams_conversion, 'is_bound': True})
                         break
             else:
-                available.append({'id': unit.id, 'name': unit.name, 'unit_type': unit.unit_type, 'grams_conversion': unit.grams_conversion, 'is_bound': False})
+                available.append({'id': unit.id, 'name': unit.name, 'name_ru': unit.name_ru, 'unit_type': unit.unit_type, 'grams_conversion': unit.grams_conversion, 'is_bound': False})
         return available
 
     def get_grams_conversion_for_unit(self, unit_id):
@@ -426,6 +426,9 @@ def inject_translations():
             'active': 'Active', 'change_name_title': 'Change Username', 'change_password_title': 'Change Password',
             'current_password_required': 'Current password is required to make changes.',
             'add_demo_recipe': 'Add Demo Recipe', 'demo_recipe_exists': 'Demo Recipe Exists',
+            'shopping_cart': 'Shopping Cart', 'add_to_cart': 'Add to Cart', 'remove_from_cart': 'Remove',
+            'cart_empty': 'Your shopping cart is empty.',
+            'per_recipe': 'Per Recipe', 'aggregated': 'All Ingredients Combined', 'cart_items': 'Recipes in Cart',
             'skip': 'Skip', 'take_tour': 'Take the Tour', 'next': 'Next', 'choose_language': 'Choose your language:',
             'tour_done': "You're all set!", 'tour_done_subtitle': 'Start exploring, add your first recipe, or browse what others have shared.',
             'get_started': 'Get Started',
@@ -519,6 +522,9 @@ def inject_translations():
             'active': 'Aktiv', 'change_name_title': 'Benutzername ändern', 'change_password_title': 'Passwort ändern',
             'current_password_required': 'Aktuelles Passwort ist erforderlich.',
             'add_demo_recipe': 'Demo-Rezept hinzufügen', 'demo_recipe_exists': 'Demo-Rezept existiert',
+            'shopping_cart': 'Einkaufswagen', 'add_to_cart': 'In den Warenkorb', 'remove_from_cart': 'Entfernen',
+            'cart_empty': 'Ihr Einkaufswagen ist leer.',
+            'per_recipe': 'Pro Rezept', 'aggregated': 'Alle Zutaten kombiniert', 'cart_items': 'Rezepte im Warenkorb',
             'skip': 'Überspringen', 'take_tour': 'Tour starten', 'next': 'Weiter', 'choose_language': 'Wählen Sie Ihre Sprache:',
             'tour_done': 'Bereit!', 'tour_done_subtitle': 'Erkunden Sie die App, erstellen Sie Ihr erstes Rezept oder stöbern Sie in den Rezepten anderer.',
             'get_started': 'Loslegen',
@@ -612,6 +618,9 @@ def inject_translations():
             'active': 'Активен', 'change_name_title': 'Изменить имя пользователя', 'change_password_title': 'Изменить пароль',
             'current_password_required': 'Текущий пароль обязателен.',
             'add_demo_recipe': 'Добавить демо-рецепт', 'demo_recipe_exists': 'Демо-рецепт существует',
+            'shopping_cart': 'Корзина', 'add_to_cart': 'В корзину', 'remove_from_cart': 'Удалить',
+            'cart_empty': 'Ваша корзина пуста.',
+            'per_recipe': 'На рецепт', 'aggregated': 'Все ингредиенты вместе', 'cart_items': 'Рецепты в корзине',
             'skip': 'Пропустить', 'take_tour': 'Начать тур', 'next': 'Далее', 'choose_language': 'Выберите язык:',
             'tour_done': 'Всё готово!', 'tour_done_subtitle': 'Начинайте исследовать, добавьте первый рецепт или посмотрите, что создали другие.',
             'get_started': 'Начать',
@@ -668,7 +677,9 @@ def inject_translations():
         if hasattr(unit, 'get_name'):
             return unit.get_name(current_lang)
         if isinstance(unit, dict):
-            return unit.get('name_ru', unit.get('name', ''))
+            if current_lang == 'ru' and unit.get('name_ru'):
+                return unit['name_ru']
+            return unit.get('name', '')
         return str(unit)
 
     def translate_tag_name(tag):
@@ -689,6 +700,17 @@ def inject_translations():
             pass
         return 'г' if current_lang == 'ru' else 'g'
 
+    def fmt_amount(amount):
+        if amount is None:
+            return ''
+        try:
+            f = float(amount)
+            if f == int(f):
+                return str(int(f))
+            return str(round(f, 4)).rstrip('0').rstrip('.')
+        except (ValueError, TypeError):
+            return str(amount)
+
     return dict(
         t=lambda key: translations_dict.get(current_lang, translations_dict['en']).get(key, key),
         lang=current_lang,
@@ -697,6 +719,7 @@ def inject_translations():
         translate_unit=translate_unit_name,
         translate_tag=translate_tag_name,
         get_unit_name=get_unit_name,
+        fmt_amount=fmt_amount,
         request=request
     )
 
@@ -1607,6 +1630,159 @@ def manage_data():
         tags = Tag.query.filter(Tag.creator_id == current_user.id).all()
 
     return render_template('manage_data.html', ingredients=ingredients, units=units, tags=tags)
+
+@app.route("/cart")
+def cart_page():
+    cart = session.get('cart', [])
+    cart_items = []
+    for item in cart:
+        recipe = Recipe.query.get(item['recipe_id'])
+        if not recipe:
+            continue
+        scale = item['portions'] / recipe.portions if recipe and recipe.portions else 1
+        ingredients = []
+        for ri in recipe.recipe_ingredients:
+            unit_grams = 1.0
+            if ri.unit:
+                if ri.unit.unit_type == 'volume':
+                    density = ri.ingredient.density if ri.ingredient.density else 1.0
+                    unit_grams = ri.unit.grams_conversion * density
+                else:
+                    unit_grams = ri.unit.grams_conversion
+            scaled_amount = round(ri.amount * scale, 2)
+            ingredients.append({
+                'ingredient': ri.ingredient,
+                'amount': scaled_amount,
+                'display_unit': ri.display_unit,
+                'amount_grams': round(ri.amount_grams * scale, 2),
+                'unit': ri.unit,
+                'unit_grams': unit_grams,
+                'step_number': ri.step_number,
+                'available_units': ri.ingredient.get_available_units(),
+                'density': ri.ingredient.density,
+                'density_unit': ri.ingredient.density_unit,
+                'grams_per_unit': ri.ingredient.grams_per_unit,
+                'original_unit_id': ri.unit_id
+            })
+        cart_items.append({
+            'recipe': recipe,
+            'portions': item['portions'],
+            'ingredients': ingredients
+        })
+
+    aggregated = {}
+    for item in cart_items:
+        for ing in item['ingredients']:
+            ing_id = ing['ingredient'].id
+            if ing_id not in aggregated:
+                aggregated[ing_id] = {
+                    'ingredient': ing['ingredient'],
+                    'total_grams': 0,
+                    'amounts': [],
+                    'available_units': ing['available_units'],
+                    'density': ing['density'],
+                    'density_unit': ing['density_unit'],
+                    'grams_per_unit': ing['grams_per_unit']
+                }
+            aggregated[ing_id]['total_grams'] += ing['amount_grams']
+            aggregated[ing_id]['amounts'].append(ing)
+
+    total_count = len(cart)
+    return render_template('cart.html', cart_items=cart_items, aggregated=list(aggregated.values()), total_count=total_count)
+
+@app.route("/api/cart/add", methods=['POST'])
+def cart_add():
+    recipe_id = request.form.get('recipe_id', type=int)
+    portions = request.form.get('portions', type=float)
+    if not recipe_id or not portions:
+        return jsonify({'error': 'Missing parameters'}), 400
+    recipe = Recipe.query.get(recipe_id)
+    if not recipe:
+        return jsonify({'error': 'Recipe not found'}), 404
+    cart = session.get('cart', [])
+    for item in cart:
+        if item['recipe_id'] == recipe_id:
+            item['portions'] = portions
+            session['cart'] = cart
+            return jsonify({'success': True, 'count': len(cart)})
+    cart.append({'recipe_id': recipe_id, 'portions': portions})
+    session['cart'] = cart
+    return jsonify({'success': True, 'count': len(cart)})
+
+@app.route("/api/cart/remove", methods=['POST'])
+def cart_remove():
+    recipe_id = request.form.get('recipe_id', type=int)
+    if not recipe_id:
+        return jsonify({'error': 'Missing parameters'}), 400
+    cart = session.get('cart', [])
+    cart = [item for item in cart if item['recipe_id'] != recipe_id]
+    session['cart'] = cart
+    return jsonify({'success': True, 'count': len(cart)})
+
+@app.route("/api/cart/count")
+def cart_count():
+    cart = session.get('cart', [])
+    return jsonify({'count': len(cart)})
+
+@app.route("/api/cart/copy", methods=['POST'])
+def cart_copy():
+    cart = session.get('cart', [])
+    lang = session.get('lang', 'en')
+    import json as _json
+    selected_units_raw = request.form.get('selected_units', '{}')
+    try:
+        selected_units = _json.loads(selected_units_raw)
+    except (ValueError, TypeError):
+        selected_units = {}
+
+    aggregated = {}
+    for item in cart:
+        recipe = Recipe.query.get(item['recipe_id'])
+        if not recipe:
+            continue
+        scale = item['portions'] / recipe.portions if recipe.portions else 1
+        for ri in recipe.recipe_ingredients:
+            ing_id = ri.ingredient_id
+            grams = round(ri.amount_grams * scale, 2)
+            if ing_id not in aggregated:
+                aggregated[ing_id] = {
+                    'name': ri.ingredient.get_name(lang),
+                    'total_grams': 0,
+                    'density': ri.ingredient.density or 1.0,
+                    'density_unit': ri.ingredient.density_unit or 'g/ml',
+                    'grams_per_unit': ri.ingredient.grams_per_unit
+                }
+            aggregated[ing_id]['total_grams'] += grams
+
+    result_lines = []
+    for ing_id, data in sorted(aggregated.items(), key=lambda x: x[1]['name'].lower()):
+        total_g = data['total_grams']
+        sel = selected_units.get(str(ing_id))
+        if sel and sel.get('unit_id') and sel['unit_id'] != 'original':
+            unit_id = sel['unit_id']
+            unit_name = sel.get('unit_name', 'g')
+            unit_type = sel.get('unit_type', 'mass')
+            grams_conv = float(sel.get('grams_conversion', 1))
+            density = data['density']
+            density_unit = data['density_unit']
+            grams_per_unit = data['grams_per_unit']
+            if unit_type == 'mass':
+                display_amount = round(total_g / grams_conv, 1)
+            elif unit_type == 'volume':
+                if density_unit == 'g/unit' and grams_per_unit:
+                    display_amount = round(total_g / grams_per_unit, 1)
+                else:
+                    display_amount = round(total_g / grams_conv / density, 1)
+            else:
+                display_amount = round(total_g / grams_conv, 1)
+        else:
+            display_amount = round(total_g, 1)
+            unit_name = 'g'
+        amount_str = str(int(display_amount)) if display_amount == int(display_amount) else str(display_amount)
+        result_lines.append(f"• {amount_str} {unit_name} {data['name']}")
+
+    text = '\n'.join(result_lines) if result_lines else '—'
+    return jsonify({'text': text})
 
 @app.route("/recipe/<int:recipe_id>/print")
 def print_recipe(recipe_id):

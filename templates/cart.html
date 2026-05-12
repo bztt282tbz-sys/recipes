@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('shopping_cart') }} - Flavor Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cart-recipe-card {
+        border: none;
+        border-radius: 12px;
+        transition: box-shadow 0.2s;
+    }
+    .cart-recipe-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+    }
+    .cart-recipe-card .card-header {
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+        border-radius: 12px 12px 0 0 !important;
+        cursor: pointer;
+        padding: 0.75rem 1.25rem;
+    }
+    .cart-recipe-card .card-header:hover {
+        background: #f8f9fa;
+    }
+    .cart-recipe-card .card-body {
+        padding: 0.75rem 1.25rem;
+    }
+    .ingredient-row {
+        font-size: 0.9rem;
+        padding: 0.25rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .ingredient-row + .ingredient-row {
+        border-top: 1px solid #f0f0f0;
+    }
+    .aggregated-table {
+        font-size: 0.9rem;
+    }
+    .aggregated-table td {
+        padding: 0.35rem 0.5rem;
+    }
+    .rotate-chevron {
+        transition: transform 0.2s;
+    }
+    .rotate-chevron.open {
+        transform: rotate(90deg);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 1rem;
+        opacity: 0.4;
+    }
+    .badge-clickable { cursor: pointer; }
+    .badge-clickable:hover { opacity: 0.8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0" style="font-family: 'Playfair Display', serif;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16" style="margin-top:-4px;">
+                <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l1.313 7h8.17l1.313-7H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+            </svg>
+            {{ t('shopping_cart') }}
+        </h3>
+        <span class="badge bg-primary rounded-pill" id="cart-count-header">{{ total_count }} {{ t('cart_items') }}</span>
+    </div>
+
+    {% if not cart_items %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/>
+        </svg>
+        <h5>{{ t('cart_empty') }}</h5>
+        <a href="{{ url_for('home') }}" class="btn btn-primary mt-3">{{ t('all_recipes') }}</a>
+    </div>
+    {% else %}
+
+    <div class="row">
+        <div class="col-lg-7">
+            {% for item in cart_items %}
+            <div class="card cart-recipe-card shadow-sm mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#recipe-detail-{{ item.recipe.id }}" aria-expanded="false">
+                    <div class="d-flex align-items-center gap-2">
+                        <svg class="rotate-chevron" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                        <strong>{{ item.recipe.title }}</strong>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted small">{{ t('portions') }}: {{ item.portions }}</span>
+                        <button class="btn btn-sm btn-outline-danger remove-btn" data-recipe-id="{{ item.recipe.id }}">{{ t('remove_from_cart') }}</button>
+                    </div>
+                </div>
+                <div class="collapse" id="recipe-detail-{{ item.recipe.id }}">
+                    <div class="card-body">
+                        {% set ns = namespace(current_step=None) %}
+                        {% for ing in item.ingredients %}
+                        {% if ing.step_number and ing.step_number != ns.current_step %}
+                        {% set ns.current_step = ing.step_number %}
+                        <div class="text-muted small fw-semibold mt-2 mb-1">{{ t('step') }} {{ ing.step_number }}</div>
+                        {% endif %}
+                        <div class="ingredient-row">
+                            <span>{{ translate_ing(ing.ingredient) }}</span>
+                            <div class="dropdown">
+                                <span class="badge bg-secondary rounded-pill badge-clickable cart-unit-badge" data-bs-toggle="dropdown" aria-expanded="false"
+                                    data-ing-id="{{ ing.ingredient.id }}"
+                                    data-total-grams="{{ ing.amount_grams }}"
+                                    data-original-amount="{{ ing.amount }}"
+                                    data-original-unit="{{ ing.display_unit }}"
+                                    data-original-unit-grams="{{ ing.unit_grams }}"
+                                    data-density="{{ ing.density or '' }}"
+                                    data-density-unit="{{ ing.density_unit or '' }}"
+                                    data-grams-per-unit="{{ ing.grams_per_unit or '' }}">
+                                    {% set amount_str = ing.amount|string %}
+                                    {% set amount_display = amount_str.rstrip('0').rstrip('.') if '.' in amount_str else amount_str %}
+                                    {{ amount_display }} {{ ing.display_unit }}
+                                </span>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item active" href="#" data-unit-id="original">{{ ing.display_unit }} ({{ t('original') }})</a></li>
+                                    {% for unit in ing.available_units %}
+                                    {% if translate_unit(unit) != ing.display_unit %}
+                                    <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card cart-recipe-card shadow-sm mb-3">
+                <div class="card-header fw-semibold">
+                    {{ t('aggregated') }}
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table aggregated-table mb-0">
+                            <tbody>
+                                {% for agg in aggregated %}
+                                <tr>
+                                    <td>{{ translate_ing(agg.ingredient) }}</td>
+                                    <td class="text-end">
+                                        <div class="dropdown">
+                                            <span class="badge bg-secondary rounded-pill badge-clickable cart-unit-badge" data-bs-toggle="dropdown" aria-expanded="false"
+                                                data-ing-id="{{ agg.ingredient.id }}"
+                                                data-total-grams="{{ agg.total_grams }}"
+                                                data-original-amount="{{ agg.total_grams }}"
+                                                data-original-unit="{% if lang == 'ru' %}г{% else %}g{% endif %}"
+                                                data-original-unit-grams="1"
+                                                data-density="{{ agg.density or '' }}"
+                                                data-density-unit="{{ agg.density_unit or '' }}"
+                                                data-grams-per-unit="{{ agg.grams_per_unit or '' }}">
+                                                {% set total_grams_display = agg.total_grams|string %}
+                                                {% set total_grams_display = total_grams_display.rstrip('0').rstrip('.') if '.' in total_grams_display else total_grams_display %}
+                                                {% if lang == 'ru' %}{{ total_grams_display }} г{% else %}{{ total_grams_display }} g{% endif %}
+                                            </span>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item active" href="#" data-unit-id="original">{% if lang == 'ru' %}г{% else %}g{% endif %} ({{ t('original') }})</a></li>
+                                                {% for unit in agg.available_units %}
+                                                {% if translate_unit(unit) != (lang == 'ru' and 'г' or 'g') %}
+                                                <li><a class="dropdown-item" href="#" data-unit-id="{{ unit.id }}" data-unit-name="{{ translate_unit(unit) }}" data-unit-type="{{ unit.unit_type }}" data-grams="{{ unit.grams_conversion }}">{{ translate_unit(unit) }}</a></li>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mb-2" id="copy-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                    <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                    <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                </svg>
+                {{ t('copy_to_clipboard') }}
+            </button>
+            <div id="copy-feedback" class="text-success small text-center" style="display:none;">Copied!</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.remove-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var recipeId = this.dataset.recipeId;
+        var formData = new FormData();
+        formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+        formData.append('recipe_id', recipeId);
+        fetch('/api/cart/remove', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    });
+});
+
+document.getElementById('copy-btn')?.addEventListener('click', function() {
+    var selectedUnits = {};
+    document.querySelectorAll('.cart-unit-badge[data-selected-unit-id]').forEach(function(b) {
+        var ingId = b.dataset.ingId;
+        selectedUnits[ingId] = {
+            unit_id: b.dataset.selectedUnitId,
+            unit_name: b.dataset.selectedUnitName,
+            unit_type: b.dataset.selectedUnitType,
+            grams_conversion: b.dataset.selectedUnitGrams
+        };
+    });
+    var formData = new FormData();
+    formData.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+    formData.append('selected_units', JSON.stringify(selectedUnits));
+    fetch('/api/cart/copy', {
+        method: 'POST',
+        body: new URLSearchParams(formData)
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(data.text).then(function() {
+                    var fb = document.getElementById('copy-feedback');
+                    fb.style.display = 'block';
+                    setTimeout(function() { fb.style.display = 'none'; }, 2000);
+                });
+            } else {
+                var ta = document.createElement('textarea');
+                ta.value = data.text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                var fb = document.getElementById('copy-feedback');
+                fb.style.display = 'block';
+                setTimeout(function() { fb.style.display = 'none'; }, 2000);
+            }
+        }
+    });
+});
+
+document.querySelectorAll('.cart-unit-badge').forEach(function(badge) {
+    var ingId = badge.dataset.ingId;
+
+    badge.parentElement.querySelectorAll('.dropdown-item[data-unit-id]').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            var menu = this.closest('.dropdown-menu');
+            var b = menu.parentElement.querySelector('.cart-unit-badge');
+            var ingId = b.dataset.ingId;
+            var densityUnit = b.dataset.densityUnit;
+            var density = parseFloat(b.dataset.density) || 1.0;
+            var gramsPerUnit = parseFloat(b.dataset.gramsPerUnit);
+            var unitId = this.dataset.unitId;
+            var unitName = this.dataset.unitName;
+            var unitType = this.dataset.unitType;
+            var gramsConv = parseFloat(this.dataset.grams);
+
+            var bOriginalAmount = parseFloat(b.dataset.originalAmount);
+            var bOriginalUnitGrams = parseFloat(b.dataset.originalUnitGrams) || 1;
+            var bOriginalUnit = b.dataset.originalUnit;
+            var bTotalGrams = parseFloat(b.dataset.totalGrams);
+
+            if (unitId === 'original') {
+                b.textContent = (bOriginalAmount % 1 === 0 ? bOriginalAmount : Math.round(bOriginalAmount * 100) / 100) + ' ' + bOriginalUnit;
+                delete b.dataset.selectedUnitId;
+            } else {
+                var displayAmount;
+                if (unitType === 'mass') {
+                    displayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
+                } else if (unitType === 'volume') {
+                    if (densityUnit === 'g/unit' && gramsPerUnit) {
+                        displayAmount = Math.round(bTotalGrams / gramsPerUnit * 100) / 100;
+                    } else {
+                        displayAmount = Math.round(bTotalGrams / gramsConv / density * 100) / 100;
+                    }
+                } else {
+                    displayAmount = Math.round(bTotalGrams / gramsConv * 100) / 100;
+                }
+                var displayStr = displayAmount % 1 === 0 ? displayAmount : displayAmount;
+                b.textContent = displayStr + ' ' + unitName;
+                b.dataset.selectedUnitId = unitId;
+                b.dataset.selectedUnitName = unitName;
+                b.dataset.selectedUnitType = unitType;
+                b.dataset.selectedUnitGrams = gramsConv;
+            }
+
+            menu.querySelectorAll('.dropdown-item').forEach(function(i) { i.classList.remove('active'); });
+            this.classList.add('active');
+        });
+    });
+});
+</script>
+{% endblock %}
