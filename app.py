@@ -1518,37 +1518,37 @@ def create_demo_recipe():
     db.session.commit()
     return True
 
-if __name__ == '__main__':
+def init_db():
     with app.app_context():
         db.create_all()
-
-        g_unit = Unit.query.filter_by(name='g').first()
-        if not g_unit:
-            g_unit = Unit(name='g', name_ru='г', unit_type='mass', grams_conversion=1.0, creator_id=1)
-            db.session.add(g_unit)
-
-        ml_unit = Unit.query.filter_by(name='mL').first()
-        if not ml_unit:
-            ml_unit = Unit(name='mL', name_ru='мл', unit_type='volume', grams_conversion=1.0, creator_id=1)
-            db.session.add(ml_unit)
-
-        tbsp_unit = Unit.query.filter_by(name='EL').first()
-        if not tbsp_unit:
-            tbsp_unit = Unit(name='EL', name_ru='ст.л.', unit_type='volume', grams_conversion=15.0, creator_id=1)
-            db.session.add(tbsp_unit)
-
-        tsp_unit = Unit.query.filter_by(name='TL').first()
-        if not tsp_unit:
-            tsp_unit = Unit(name='TL', name_ru='ч.л.', unit_type='volume', grams_conversion=5.0, creator_id=1)
-            db.session.add(tsp_unit)
-
-        db.session.commit()
 
         user = User.query.first()
         if not user:
             user = User(username='demo', password=bcrypt.generate_password_hash('demo').decode('utf-8'), is_admin=True)
             db.session.add(user)
             db.session.commit()
+
+        g_unit = Unit.query.filter_by(name='g').first()
+        if not g_unit:
+            g_unit = Unit(name='g', name_ru='г', unit_type='mass', grams_conversion=1.0, creator_id=user.id)
+            db.session.add(g_unit)
+
+        ml_unit = Unit.query.filter_by(name='mL').first()
+        if not ml_unit:
+            ml_unit = Unit(name='mL', name_ru='мл', unit_type='volume', grams_conversion=1.0, creator_id=user.id)
+            db.session.add(ml_unit)
+
+        tbsp_unit = Unit.query.filter_by(name='EL').first()
+        if not tbsp_unit:
+            tbsp_unit = Unit(name='EL', name_ru='ст.л.', unit_type='volume', grams_conversion=15.0, creator_id=user.id)
+            db.session.add(tbsp_unit)
+
+        tsp_unit = Unit.query.filter_by(name='TL').first()
+        if not tsp_unit:
+            tsp_unit = Unit(name='TL', name_ru='ч.л.', unit_type='volume', grams_conversion=5.0, creator_id=user.id)
+            db.session.add(tsp_unit)
+
+        db.session.commit()
 
         if not Ingredient.query.filter_by(name='Flour (Type 405)').first():
             flour = Ingredient(name='Flour (Type 405)', language='en', density=0.55, density_unit='g/ml', creator_id=user.id)
@@ -1595,6 +1595,10 @@ if __name__ == '__main__':
 
             db.session.commit()
 
-        
+        if not Recipe.query.first():
+            create_demo_recipe()
 
+init_db()
+
+if __name__ == '__main__':
     app.run(debug=os.environ.get('FLASK_ENV') != 'production', port=5000)
