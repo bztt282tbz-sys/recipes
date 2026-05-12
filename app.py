@@ -1143,7 +1143,11 @@ def add_ingredient():
                     return render_template('add_ingredient.html')
         elif density_type == 'g/unit':
             grams_val = request.form.get('grams_per_unit')
-            if grams_val:
+            unit_name = request.form.get('unit_name', '').strip()
+            if unit_name:
+                if not grams_val:
+                    flash('Grams per unit is required when a unit name is provided', 'danger')
+                    return render_template('add_ingredient.html')
                 try:
                     grams_per_unit = float(grams_val)
                     if grams_per_unit <= 0:
@@ -1151,59 +1155,58 @@ def add_ingredient():
                 except ValueError:
                     flash('Grams per unit must be a positive number', 'danger')
                     return render_template('add_ingredient.html')
-            unit_name = request.form.get('unit_name', '').strip()
 
         comment = request.form.get('comment') or None
         language = request.form.get('language', session.get('lang', 'en'))
 
-        new_ingredient = Ingredient(
-            name=name,
-            language=primary_lang,
-            density=density,
-            density_unit=density_type,
-            grams_per_unit=grams_per_unit,
-            unit_name=unit_name,
-            comment=comment,
-            creator_id=current_user.id
-        )
-        db.session.add(new_ingredient)
-        db.session.flush()
-
-        for lang in ['en', 'de', 'ru']:
-            trans_name = request.form.get(f'name_{lang}', '').strip()
-            if trans_name and lang != primary_lang:
-                existing = IngredientTranslation.query.filter_by(ingredient_id=new_ingredient.id, language=lang).first()
-                if existing:
-                    existing.name = trans_name
-                else:
-                    new_trans = IngredientTranslation(
-                        ingredient_id=new_ingredient.id,
-                        language=lang,
-                        name=trans_name
-                    )
-                    db.session.add(new_trans)
-
-        if density_type == 'g/unit' and unit_name:
-            new_unit = Unit(
-                name=unit_name,
-                unit_type='count',
-                grams_conversion=grams_per_unit,
-                is_bound=True,
+        try:
+            new_ingredient = Ingredient(
+                name=name,
+                language=primary_lang,
+                density=density,
+                density_unit=density_type,
+                grams_per_unit=grams_per_unit,
+                unit_name=unit_name,
+                comment=comment,
                 creator_id=current_user.id
             )
-            db.session.add(new_unit)
+            db.session.add(new_ingredient)
             db.session.flush()
 
-            new_ingredient.preferred_unit_id = new_unit.id
+            for lang in ['en', 'de', 'ru']:
+                trans_name = request.form.get(f'name_{lang}', '').strip()
+                if trans_name and lang != primary_lang:
+                    existing = IngredientTranslation.query.filter_by(ingredient_id=new_ingredient.id, language=lang).first()
+                    if existing:
+                        existing.name = trans_name
+                    else:
+                        new_trans = IngredientTranslation(
+                            ingredient_id=new_ingredient.id,
+                            language=lang,
+                            name=trans_name
+                        )
+                        db.session.add(new_trans)
 
-            ui = UnitIngredient(
-                unit_id=new_unit.id,
-                ingredient_id=new_ingredient.id,
-                grams_override=grams_per_unit
-            )
-            db.session.add(ui)
+            if density_type == 'g/unit' and unit_name and grams_per_unit:
+                new_unit = Unit(
+                    name=unit_name,
+                    unit_type='count',
+                    grams_conversion=grams_per_unit,
+                    is_bound=True,
+                    creator_id=current_user.id
+                )
+                db.session.add(new_unit)
+                db.session.flush()
 
-        try:
+                new_ingredient.preferred_unit_id = new_unit.id
+
+                ui = UnitIngredient(
+                    unit_id=new_unit.id,
+                    ingredient_id=new_ingredient.id,
+                    grams_override=grams_per_unit
+                )
+                db.session.add(ui)
+
             db.session.commit()
             flash('Ingredient added!', 'success')
             return redirect(url_for('home'))
@@ -1255,11 +1258,12 @@ def add_unit():
         grams_overrides = request.form.getlist('grams_override[]')
 
         for i in range(len(ingredient_ids)):
-            if ingredient_ids[i] and i < len(grams_overrides) and grams_overrides[i]:
+            if ingredient_ids[i]:
+                override = grams_overrides[i] if i < len(grams_overrides) and grams_overrides[i] else grams_conversion
                 ui = UnitIngredient(
                     unit_id=new_unit.id,
                     ingredient_id=int(ingredient_ids[i]),
-                    grams_override=float(grams_overrides[i])
+                    grams_override=float(override)
                 )
                 db.session.add(ui)
 
@@ -1317,6 +1321,21 @@ def manage_data():
                     except ValueError:
                         pass
                 unit.is_bound = True if request.form.get('is_bound') else False
+
+                UnitIngredient.query.filter_by(unit_id=unit.id).delete()
+
+                ingredient_ids = request.form.getlist('ingredient_id[]')
+                grams_overrides = request.form.getlist('grams_override[]')
+                for i in range(len(ingredient_ids)):
+                    if ingredient_ids[i]:
+                        override = grams_overrides[i] if i < len(grams_overrides) and grams_overrides[i] else unit.grams_conversion
+                        ui = UnitIngredient(
+                            unit_id=unit.id,
+                            ingredient_id=int(ingredient_ids[i]),
+                            grams_override=float(override)
+                        )
+                        db.session.add(ui)
+
                 db.session.commit()
                 flash('Unit updated!', 'success')
 

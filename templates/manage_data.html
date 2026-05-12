@@ -127,38 +127,58 @@
                 </thead>
                 <tbody>
                     {% for unit in units %}
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="edit_unit">
+                        <input type="hidden" name="unit_id" value="{{ unit.id }}">
                     <tr>
-                        <form method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="action" value="edit_unit">
-                            <input type="hidden" name="unit_id" value="{{ unit.id }}">
-                            <td><input type="text" name="name" class="form-control form-control-sm" value="{{ unit.name }}"></td>
-                            <td><input type="text" name="name_ru" class="form-control form-control-sm" value="{{ unit.name_ru or '' }}" placeholder="г, мл, ст.л."></td>
-                            <td>
-                                <select name="unit_type" class="form-select form-select-sm">
-                                    <option value="mass" {% if unit.unit_type == 'mass' %}selected{% endif %}>Mass</option>
-                                    <option value="volume" {% if unit.unit_type == 'volume' %}selected{% endif %}>Volume</option>
-                                    <option value="count" {% if unit.unit_type == 'count' %}selected{% endif %}>Count</option>
-                                </select>
-                            </td>
-                            <td><input type="number" step="0.01" name="grams_conversion" class="form-control form-control-sm" value="{{ unit.grams_conversion }}" style="width: 80px;"></td>
-                            <td>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="is_bound" {% if unit.is_bound %}checked{% endif %}>
+                        <td><input type="text" name="name" class="form-control form-control-sm" value="{{ unit.name }}"></td>
+                        <td><input type="text" name="name_ru" class="form-control form-control-sm" value="{{ unit.name_ru or '' }}" placeholder="г, мл, ст.л."></td>
+                        <td>
+                            <select name="unit_type" class="form-select form-select-sm">
+                                <option value="mass" {% if unit.unit_type == 'mass' %}selected{% endif %}>Mass</option>
+                                <option value="volume" {% if unit.unit_type == 'volume' %}selected{% endif %}>Volume</option>
+                                <option value="count" {% if unit.unit_type == 'count' %}selected{% endif %}>Count</option>
+                            </select>
+                        </td>
+                        <td><input type="number" step="0.01" name="grams_conversion" class="form-control form-control-sm" value="{{ unit.grams_conversion }}" style="width: 80px;"></td>
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_bound" id="bound-{{ unit.id }}" {% if unit.is_bound %}checked{% endif %} onchange="toggleUnitBindings({{ unit.id }})">
+                            </div>
+                        </td>
+                        <td>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ t('save') }}</button>
+                        </td>
+                    </tr>
+                    <tr id="bindings-{{ unit.id }}" {% if not unit.is_bound %}style="display:none"{% endif %}>
+                        <td colspan="6">
+                            <div class="row">
+                            {% for ing in ingredients %}
+                                <div class="col-md-4 mb-1">
+                                    <div class="form-check form-check-inline">
+                                        <input type="checkbox" name="ingredient_id[]" value="{{ ing.id }}" class="form-check-input" id="uing-{{ unit.id }}-{{ ing.id }}"
+                                            {% for ui in unit.ingredient_units %}{% if ui.ingredient_id == ing.id %}checked{% endif %}{% endfor %}>
+                                        <label class="form-check-label" for="uing-{{ unit.id }}-{{ ing.id }}">{{ ing.name }}</label>
+                                    </div>
+                                    <input type="number" step="0.01" name="grams_override[]" class="form-control form-control-sm" placeholder="grams" style="width: 100px; display: inline-block;">
                                 </div>
-                            </td>
-                            <td>
-                                <button type="submit" class="btn btn-sm btn-primary">{{ t('save') }}</button>
-                            </td>
-                        </form>
+                            {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    </form>
+                    <tr>
+                        <td colspan="6">
                             {% if current_user.is_admin or unit.creator_id == current_user.id %}
                             <form method="POST" class="d-inline" onsubmit="return confirm('{{ t('confirm_delete') }}?')">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delete_unit">
                                 <input type="hidden" name="unit_id" value="{{ unit.id }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">{{ t('delete_unit') }}</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger float-end">{{ t('delete_unit') }}</button>
                             </form>
                             {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -166,4 +186,14 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleUnitBindings(unitId) {
+    const row = document.getElementById('bindings-' + unitId);
+    const checkbox = document.getElementById('bound-' + unitId);
+    row.style.display = checkbox.checked ? '' : 'none';
+}
+</script>
 {% endblock %}

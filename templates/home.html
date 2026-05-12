@@ -108,14 +108,6 @@
         background: #e0e0e0;
         color: #666;
     }
-    .tag-badge {
-        font-size: 0.7rem;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: #d4edda;
-        color: #155724;
-        margin-right: 4px;
-    }
     .grouped-badge {
         font-size: 0.7rem;
         padding: 2px 6px;
@@ -184,9 +176,6 @@
                     {% if recipe.is_draft and current_user.is_authenticated and recipe.creator_id == current_user.id %}
                         <span class="badge badge-draft ms-2">{{ t('draft') }}</span>
                     {% endif %}
-                    {% for tag in recipe.tags %}
-                        <span class="tag-badge">{{ tag.tag.name }}</span>
-                    {% endfor %}
                     {% if recipe.group_id %}
                         <span class="grouped-badge">grouped</span>
                         {% if recipe._group_variants %}
@@ -235,9 +224,6 @@
                             <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
                         </svg>
                         <span>{{ recipe.author.username }}</span>
-                        {% for tag in recipe.tags %}
-                            <span class="tag-badge">{{ tag.tag.name }}</span>
-                        {% endfor %}
                         <span class="lang-badge ms-1">{{ recipe.language|upper }}</span>
                     </div>
                 </div>

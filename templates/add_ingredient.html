@@ -2,51 +2,7 @@
 
 {% block title %}{{ t('add_ingredient') }} - Flavor Archive{% endblock %}
 
-{% block extra_css %}
-<style>
-    .tag-input {
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        padding: 8px;
-        min-height: 38px;
-    }
-    .tag-chip {
-        display: inline-flex;
-        align-items: center;
-        background: #e9ecef;
-        padding: 4px 8px;
-        border-radius: 4px;
-        margin: 2px;
-        font-size: 0.875rem;
-    }
-    .tag-chip-remove {
-        margin-left: 6px;
-        cursor: pointer;
-        color: #dc3545;
-    }
-    .tag-dropdown {
-        position: absolute;
-        z-index: 1000;
-        background: white;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        max-height: 200px;
-        overflow-y: auto;
-        width: 100%;
-        display: none;
-    }
-    .tag-dropdown-item {
-        padding: 8px 12px;
-        cursor: pointer;
-    }
-    .tag-dropdown-item:hover {
-        background: #f8f9fa;
-    }
-    .tag-wrapper {
-        position: relative;
-    }
-</style>
-{% endblock %}
+{% block extra_css %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -54,7 +10,7 @@
         <div class="card shadow">
             <div class="card-body">
                 <h3 class="mb-4">{{ t('add_ingredient') }}</h3>
-                <form method="POST" onsubmit="prepareTags()">
+                <form method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label">Primary Language</label>
@@ -79,17 +35,6 @@
                         </div>
                     </div>
                     <small class="text-muted d-block mb-3">At least one name is required. Fill in names for other languages as available.</small>
-                    <div class="mb-3">
-                        <label class="form-label">Tags (comma separated or click to add)</label>
-                        <div class="tag-wrapper">
-                            <div class="tag-input" id="tagContainer" onclick="focusTagInput()">
-                                <input type="text" id="tagInput" placeholder="Type to search or create tags..." oninput="searchTags(this.value)" onkeydown="handleTagKeydown(event)" style="border: none; outline: none; width: 200px;">
-                            </div>
-                            <div class="tag-dropdown" id="tagDropdown"></div>
-                        </div>
-                        <input type="hidden" name="tag_ids" id="tagIds">
-                        <input type="hidden" name="new_tags" id="newTags">
-                    </div>
                     <div class="mb-3">
                         <label class="form-label">{{ t('density') }} Type</label>
                         <select name="density_type" id="densityType" class="form-select" onchange="updateDensityFields()">
@@ -118,7 +63,7 @@
                     </div>
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('home') }}" class="btn btn-secondary">{{ t('cancel') }}</a>
-                        <button type="submit" class="btn btn-success" onclick="prepareTags()">{{ t('save') }}</button>
+                        <button type="submit" class="btn btn-success">{{ t('save') }}</button>
                     </div>
                 </form>
             </div>
@@ -140,98 +85,11 @@ function updateNameLabels() {
     document.getElementById('label_de').textContent = labels[lang][1];
     document.getElementById('label_ru').textContent = labels[lang][2];
 }
-</script>
-{% endblock %}
 
-{% block extra_js %}
-<script>
 function updateDensityFields() {
     const type = document.getElementById('densityType').value;
     document.getElementById('densityMlField').style.display = type === 'g/ml' ? 'block' : 'none';
     document.getElementById('densityUnitFields').style.display = type === 'g/unit' ? 'block' : 'none';
 }
-
-let selectedTags = [];
-
-function focusTagInput() {
-    document.getElementById('tagInput').focus();
-}
-
-function searchTags(query) {
-    const dropdown = document.getElementById('tagDropdown');
-    if (!query) {
-        dropdown.style.display = 'none';
-        return;
-    }
-    fetch('/api/tags?q=' + encodeURIComponent(query))
-        .then(r => r.json())
-        .then(data => {
-            if (data.tags && data.tags.length > 0) {
-                dropdown.innerHTML = data.tags.map(t =>
-                    `<div class="tag-dropdown-item" onclick="addTag(${t.id}, '${t.name}')">${t.name}</div>`
-                ).join('');
-                dropdown.style.display = 'block';
-            } else {
-                dropdown.innerHTML = `<div class="tag-dropdown-item" onclick="createNewTag('${query}')">Create "${query}"</div>`;
-                dropdown.style.display = 'block';
-            }
-        });
-}
-
-function addTag(id, name) {
-    if (!selectedTags.find(t => t.id === id)) {
-        selectedTags.push({id, name});
-        renderTags();
-    }
-    document.getElementById('tagInput').value = '';
-    document.getElementById('tagDropdown').style.display = 'none';
-}
-
-function createNewTag(name) {
-    if (!selectedTags.find(t => t.name === name)) {
-        selectedTags.push({id: null, name: name, isNew: true});
-        renderTags();
-    }
-    document.getElementById('tagInput').value = '';
-    document.getElementById('tagDropdown').style.display = 'none';
-}
-
-function removeTag(index) {
-    selectedTags.splice(index, 1);
-    renderTags();
-}
-
-function renderTags() {
-    const container = document.getElementById('tagContainer');
-    container.innerHTML = selectedTags.map((t, i) =>
-        `<span class="tag-chip">${t.name}<span class="tag-chip-remove" onclick="removeTag(${i})">x</span></span>`
-    ).join('') + `<input type="text" id="tagInput" placeholder="Type to search or create tags..." oninput="searchTags(this.value)" onkeydown="handleTagKeydown(event)" style="border: none; outline: none; width: 200px;">`;
-}
-
-function handleTagKeydown(e) {
-    if (e.key === 'Enter' || e.key === ',') {
-        e.preventDefault();
-        const val = e.target.value.trim().replace(',', '');
-        if (val) {
-            createNewTag(val);
-        }
-    }
-    if (e.key === 'Backspace' && !e.target.value && selectedTags.length > 0) {
-        removeTag(selectedTags.length - 1);
-    }
-}
-
-function prepareTags() {
-    const existingTags = selectedTags.filter(t => t.id !== null).map(t => t.id);
-    const newTags = selectedTags.filter(t => t.isNew).map(t => t.name).join(',');
-    document.getElementById('tagIds').value = existingTags.join(',');
-    document.getElementById('newTags').value = newTags;
-}
-
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.tag-wrapper')) {
-        document.getElementById('tagDropdown').style.display = 'none';
-    }
-});
 </script>
 {% endblock %}
