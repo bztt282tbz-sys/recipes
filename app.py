@@ -6,6 +6,7 @@ from flask_limiter.util import get_remote_address
 import os
 import uuid
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 
@@ -114,6 +115,7 @@ class User(UserMixin, db.Model):
     recipes = db.relationship('Recipe', backref='author', lazy=True)
     ingredients = db.relationship('Ingredient', backref='author', lazy=True)
     units = db.relationship('Unit', backref='author', lazy=True)
+    tags = db.relationship('Tag', backref='author', lazy=True)
 
 class Unit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -273,7 +275,7 @@ class Recipe(db.Model):
             rts = RecipeTag.query.filter_by(group_id=self.group_id).all()
         else:
             rts = RecipeTag.query.filter_by(recipe_id=self.id).all()
-        return [rt.tag for rt in rts]
+        return [rt.tag for rt in rts if rt.tag]
 
 class RecipeIngredient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -326,7 +328,25 @@ class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    translations = db.relationship('TagTranslation', backref='tag', cascade="all, delete-orphan", lazy=True)
     __table_args__ = (db.UniqueConstraint('name', 'creator_id'),)
+
+    def get_name(self, target_lang=None):
+        if target_lang is None:
+            target_lang = session.get('lang', 'en')
+        if target_lang == 'en':
+            return self.name
+        trans = TagTranslation.query.filter_by(tag_id=self.id, language=target_lang).first()
+        if trans:
+            return trans.name
+        return self.name
+
+class TagTranslation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
+    language = db.Column(db.String(10), nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    __table_args__ = (db.UniqueConstraint('tag_id', 'language'),)
 
 class RecipeTag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -432,6 +452,7 @@ def inject_translations():
             'about_drafts_search_heading': 'Drafts & Search',
             'about_drafts_search': 'Save recipes as drafts while you work on them. Find any recipe instantly with full-text search.',
             'tags': 'Tags', 'add_tag': 'Add a tag...', 'tag_create': 'Create',
+            'tag_name': 'Tag', 'delete_tag': 'Delete Tag',
             'onboard_welcome': 'Welcome to Flavor Archive',
             'onboard_subtitle': 'No recipes yet \u2014 here\u2019s what you can do:',
             'onboard_click_convert_heading': 'Click to Convert',
@@ -524,6 +545,7 @@ def inject_translations():
             'about_drafts_search_heading': 'Entwürfe & Suche',
             'about_drafts_search': 'Speichern Sie Rezepte als Entwürfe, während Sie daran arbeiten. Finden Sie jedes Rezept sofort mit der Volltextsuche.',
             'tags': 'Tags', 'add_tag': 'Tag hinzufügen...', 'tag_create': 'Erstellen',
+            'tag_name': 'Tag', 'delete_tag': 'Tag löschen',
             'onboard_welcome': 'Willkommen bei Flavor Archive',
             'onboard_subtitle': 'Noch keine Rezepte \u2014 hier erfahren Sie, was Sie tun können:',
             'onboard_click_convert_heading': 'Klicken & Umrechnen',
@@ -616,6 +638,7 @@ def inject_translations():
             'about_drafts_search_heading': 'Черновики и поиск',
             'about_drafts_search': 'Сохраняйте рецепты как черновики во время работы. Находите любой рецепт мгновенно с помощью полнотекстового поиска.',
             'tags': 'Теги', 'add_tag': 'Добавить тег...', 'tag_create': 'Создать',
+            'tag_name': 'Тег', 'delete_tag': 'Удалить тег',
             'onboard_welcome': 'Добро пожаловать в Flavor Archive',
             'onboard_subtitle': 'Рецептов пока нет — вот что вы можете сделать:',
             'onboard_click_convert_heading': 'Нажми для конвертации',
@@ -648,6 +671,13 @@ def inject_translations():
             return unit.get('name_ru', unit.get('name', ''))
         return str(unit)
 
+    def translate_tag_name(tag):
+        if hasattr(tag, 'get_name'):
+            return tag.get_name(current_lang)
+        if isinstance(tag, dict):
+            return tag.get('name', '')
+        return str(tag)
+
     def get_unit_name(unit_id):
         if unit_id is None:
             return 'г' if current_lang == 'ru' else 'g'
@@ -665,6 +695,7 @@ def inject_translations():
         languages=[('en', 'EN'), ('de', 'DE'), ('ru', 'RU')],
         translate_ing=translate_ingredient_name,
         translate_unit=translate_unit_name,
+        translate_tag=translate_tag_name,
         get_unit_name=get_unit_name,
         request=request
     )
@@ -684,6 +715,7 @@ def privacy():
 @app.route("/")
 def home():
     search_query = request.args.get('q', '')
+    tag_filter = request.args.get('tag', '').strip()
     current_lang = session.get('lang', 'en')
 
     if current_user.is_authenticated:
@@ -693,13 +725,35 @@ def home():
     else:
         base_filter = Recipe.is_draft == False
 
+    query = Recipe.query.filter(base_filter)
+    if search_query:
+        query = query.filter(Recipe.title.ilike(f'%{search_query}%'))
+
+    if tag_filter:
+        tag_obj = Tag.query.filter_by(name=tag_filter).first()
+        if tag_obj:
+            rts = RecipeTag.query.filter_by(tag_id=tag_obj.id).all()
+            recipe_ids = set()
+            group_ids = set()
+            for rt in rts:
+                if rt.recipe_id:
+                    recipe_ids.add(rt.recipe_id)
+                if rt.group_id:
+                    group_ids.add(rt.group_id)
+            if recipe_ids or group_ids:
+                filters = []
+                if recipe_ids:
+                    filters.append(Recipe.id.in_(recipe_ids))
+                if group_ids:
+                    filters.append(Recipe.group_id.in_(group_ids))
+                query = query.filter(or_(*filters))
+            else:
+                query = query.filter(Recipe.id < 0)
+
     recipes_by_group = {}
     standalone_recipes = []
 
-    all_recipes = Recipe.query.filter(base_filter)
-    if search_query:
-        all_recipes = all_recipes.filter(Recipe.title.ilike(f'%{search_query}%'))
-    all_recipes = all_recipes.order_by(Recipe.id.desc()).all()
+    all_recipes = query.order_by(Recipe.id.desc()).all()
 
     for recipe in all_recipes:
         if recipe.group_id:
@@ -736,7 +790,34 @@ def home():
     primary_recipes.sort(key=lambda x: x.id, reverse=True)
     secondary_recipes.sort(key=lambda x: x.id, reverse=True)
 
-    return render_template('home.html', recipes=primary_recipes + primary_grouped, secondary_recipes=secondary_recipes, search_query=search_query)
+    all_recipe_list = primary_recipes + primary_grouped + secondary_recipes
+    recipe_ids = [r.id for r in all_recipe_list]
+    group_ids = [r.group_id for r in all_recipe_list if r.group_id]
+
+    tag_query_filters = []
+    if recipe_ids:
+        tag_query_filters.append(RecipeTag.recipe_id.in_(recipe_ids))
+    if group_ids:
+        tag_query_filters.append(RecipeTag.group_id.in_(group_ids))
+    all_recipe_tags = RecipeTag.query.filter(or_(*tag_query_filters)).all() if tag_query_filters else []
+
+    tag_cache = {}
+    for rt in all_recipe_tags:
+        key = rt.group_id or rt.recipe_id
+        if key not in tag_cache:
+            tag_cache[key] = []
+        if rt.tag:
+            tag_cache[key].append(rt.tag)
+
+    for recipe in all_recipe_list:
+        key = recipe.group_id or recipe.id
+        recipe._tags = tag_cache.get(key, [])
+
+    tag_ids = db.session.query(RecipeTag.tag_id).distinct().all()
+    tag_ids = [t[0] for t in tag_ids if t[0]]
+    all_tags = Tag.query.filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
+
+    return render_template('home.html', recipes=primary_recipes + primary_grouped, secondary_recipes=secondary_recipes, search_query=search_query, tag_filter=tag_filter, all_tags=all_tags)
 
 @app.route("/recipe/<int:recipe_id>")
 def recipe_detail(recipe_id):
@@ -960,7 +1041,8 @@ def get_recipe_tags(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
     if recipe.creator_id != current_user.id and not current_user.is_admin:
         return jsonify([])
-    return jsonify([{'id': t.id, 'name': t.name} for t in recipe.tag_list])
+    lang = session.get('lang', 'en')
+    return jsonify([{'id': t.id, 'name': t.name, 'display_name': t.get_name(lang)} for t in recipe.tag_list])
 
 @app.route("/api/tags/search")
 @login_required
@@ -968,11 +1050,12 @@ def search_tags():
     q = request.args.get('q', '').strip()
     if not q:
         return jsonify([])
+    lang = session.get('lang', 'en')
     tags = Tag.query.filter(
         Tag.creator_id == current_user.id,
         Tag.name.ilike(f'%{q}%')
     ).limit(10).all()
-    return jsonify([{'id': t.id, 'name': t.name} for t in tags])
+    return jsonify([{'id': t.id, 'name': t.name, 'display_name': t.get_name(lang)} for t in tags])
 
 @app.route("/api/tags/add", methods=['POST'])
 @login_required
@@ -1002,7 +1085,8 @@ def add_tag():
         rt.recipe_id = recipe.id
     db.session.add(rt)
     db.session.commit()
-    return jsonify({'id': tag.id, 'name': tag.name})
+    lang = session.get('lang', 'en')
+    return jsonify({'id': tag.id, 'name': tag.name, 'display_name': tag.get_name(lang)})
 
 @app.route("/api/tags/remove", methods=['POST'])
 @login_required
@@ -1014,11 +1098,15 @@ def remove_tag():
     recipe = Recipe.query.get_or_404(recipe_id)
     if recipe.creator_id != current_user.id and not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
-    if recipe.group_id:
-        RecipeTag.query.filter_by(group_id=recipe.group_id, tag_id=tag_id).delete()
-    else:
-        RecipeTag.query.filter_by(recipe_id=recipe.id, tag_id=tag_id).delete()
-    db.session.commit()
+    try:
+        if recipe.group_id:
+            RecipeTag.query.filter_by(group_id=recipe.group_id, tag_id=tag_id).delete()
+        else:
+            RecipeTag.query.filter_by(recipe_id=recipe.id, tag_id=tag_id).delete()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
     return jsonify({'success': True})
 
 @app.route("/recipe/<int:recipe_id>/delete", methods=['POST'])
@@ -1480,11 +1568,35 @@ def manage_data():
                     db.session.commit()
                     flash('Unit deleted.', 'success')
 
+        elif action == 'edit_tag_translation':
+            tag_id = request.form.get('tag_id')
+            lang = request.form.get('language')
+            trans_name = request.form.get('translation', '').strip()
+            if tag_id and lang and trans_name and current_user.is_admin:
+                existing = TagTranslation.query.filter_by(tag_id=int(tag_id), language=lang).first()
+                if existing:
+                    existing.name = trans_name
+                else:
+                    db.session.add(TagTranslation(tag_id=int(tag_id), language=lang, name=trans_name))
+                db.session.commit()
+                flash('Tag translation saved!', 'success')
+
+        elif action == 'delete_tag':
+            tag_id = request.form.get('tag_id')
+            if tag_id and current_user.is_admin:
+                tag = Tag.query.get(int(tag_id))
+                if tag:
+                    RecipeTag.query.filter_by(tag_id=tag.id).delete()
+                    db.session.delete(tag)
+                    db.session.commit()
+                    flash('Tag deleted.', 'success')
+
         return redirect(url_for('manage_data'))
 
     if current_user.is_admin:
         ingredients = Ingredient.query.all()
         units = Unit.query.all()
+        tags = Tag.query.all()
     else:
         ingredients = Ingredient.query.filter(
             (Ingredient.creator_id == current_user.id) | (Ingredient.creator_id == None)
@@ -1492,8 +1604,9 @@ def manage_data():
         units = Unit.query.filter(
             (Unit.creator_id == current_user.id) | (Unit.creator_id == None)
         ).all()
+        tags = Tag.query.filter(Tag.creator_id == current_user.id).all()
 
-    return render_template('manage_data.html', ingredients=ingredients, units=units)
+    return render_template('manage_data.html', ingredients=ingredients, units=units, tags=tags)
 
 @app.route("/recipe/<int:recipe_id>/print")
 def print_recipe(recipe_id):

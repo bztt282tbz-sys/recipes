@@ -64,7 +64,7 @@
                                 <div id="currentTags" class="d-flex flex-wrap gap-1 mb-2">
                                     {% for tag in recipe.tag_list %}
                                     <span class="badge bg-info d-inline-flex align-items-center" data-tag-id="{{ tag.id }}">
-                                        {{ tag.name }}
+                                        {{ translate_tag(tag) }}
                                         <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.6em" onclick="removeTag({{ tag.id }})"></button>
                                     </span>
                                     {% endfor %}
@@ -245,7 +245,7 @@ function loadTags() {
             const container = document.getElementById('currentTags');
             document.getElementById('tagCount').textContent = tags.length;
             container.innerHTML = tags.map(t =>
-                `<span class="badge bg-info d-inline-flex align-items-center" data-tag-id="${t.id}">${t.name} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.6em" onclick="removeTag(${t.id})"></button></span>`
+                `<span class="badge bg-info d-inline-flex align-items-center" data-tag-id="${t.id}">${t.display_name || t.name} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.6em" onclick="removeTag(${t.id})"></button></span>`
             ).join('');
         });
 }
@@ -296,7 +296,8 @@ function searchTags() {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = 'list-group-item list-group-item-action py-1';
-                item.textContent = t.name;
+                item.textContent = t.display_name || t.name;
+                item.dataset.tagName = t.name;
                 item.onclick = () => { document.getElementById('tagInput').value = t.name; addTag(); };
                 suggestions.appendChild(item);
             });

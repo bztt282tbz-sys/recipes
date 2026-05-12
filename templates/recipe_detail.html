@@ -24,7 +24,7 @@
                 {% if recipe.tag_list %}
                 <div class="mb-3">
                     {% for tag in recipe.tag_list %}
-                    <span class="badge bg-info me-1">{{ tag.name }}</span>
+                    <span class="badge bg-info me-1">{{ translate_tag(tag) }}</span>
                     {% endfor %}
                 </div>
                 {% endif %}
