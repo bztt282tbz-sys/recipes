@@ -21,6 +21,13 @@
             <div class="card-body">
                 <h1>{{ recipe.title }}</h1>
                 <p class="lead text-muted">{{ recipe.description or '' }}</p>
+                {% if recipe.tag_list %}
+                <div class="mb-3">
+                    {% for tag in recipe.tag_list %}
+                    <span class="badge bg-info me-1">{{ tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 {% if recipe.instructions %}
                 <hr>
                 <h4>{{ t('notes') }}</h4>

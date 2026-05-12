@@ -55,6 +55,29 @@
                         {% endif %}
                     </div>
 
+                    <div class="mb-3">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#tagsPanel" aria-expanded="false">
+                            Tags (<span id="tagCount">{{ recipe.tag_list|length }}</span>) ▾
+                        </button>
+                        <div class="collapse mt-2" id="tagsPanel">
+                            <div class="card card-body py-2 px-3">
+                                <div id="currentTags" class="d-flex flex-wrap gap-1 mb-2">
+                                    {% for tag in recipe.tag_list %}
+                                    <span class="badge bg-info d-inline-flex align-items-center" data-tag-id="{{ tag.id }}">
+                                        {{ tag.name }}
+                                        <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.6em" onclick="removeTag({{ tag.id }})"></button>
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="tagInput" class="form-control" placeholder="Add a tag...">
+                                    <button class="btn btn-primary" type="button" id="addTagBtn">+</button>
+                                </div>
+                                <div id="tagSuggestions" class="list-group mt-1" style="max-height:150px;overflow-y:auto;display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <hr>
                     <h5>{{ t('instructions') }}</h5>
                     <div id="steps-container">
@@ -211,5 +234,116 @@ function addStep() {
 
 function removeRow(btn) { btn.closest('.ingredient-row').remove(); }
 function removeStep(num) { document.getElementById('step-' + num).remove(); }
+
+const recipeId = {{ recipe.id }};
+let tagSuggestionIndex = -1;
+
+function loadTags() {
+    fetch(`/api/recipe/${recipeId}/tags`)
+        .then(r => r.json())
+        .then(tags => {
+            const container = document.getElementById('currentTags');
+            document.getElementById('tagCount').textContent = tags.length;
+            container.innerHTML = tags.map(t =>
+                `<span class="badge bg-info d-inline-flex align-items-center" data-tag-id="${t.id}">${t.name} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.6em" onclick="removeTag(${t.id})"></button></span>`
+            ).join('');
+        });
+}
+
+function addTag() {
+    const input = document.getElementById('tagInput');
+    const name = input.value.trim();
+    if (!name) return;
+    fetch('/api/tags/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({
+            'csrf_token': document.querySelector('[name=csrf_token]').value,
+            'recipe_id': recipeId,
+            'tag_name': name
+        })
+    }).then(r => r.json()).then(() => {
+        input.value = '';
+        document.getElementById('tagSuggestions').style.display = 'none';
+        tagSuggestionIndex = -1;
+        loadTags();
+    });
+}
+
+function removeTag(tagId) {
+    fetch('/api/tags/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({
+            'csrf_token': document.querySelector('[name=csrf_token]').value,
+            'recipe_id': recipeId,
+            'tag_id': tagId
+        })
+    }).then(r => r.json()).then(() => loadTags());
+}
+
+function searchTags() {
+    const input = document.getElementById('tagInput');
+    const q = input.value.trim();
+    const suggestions = document.getElementById('tagSuggestions');
+    if (!q) { suggestions.style.display = 'none'; tagSuggestionIndex = -1; return; }
+    fetch(`/api/tags/search?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(tags => {
+            suggestions.innerHTML = '';
+            tagSuggestionIndex = -1;
+            tags.forEach(t => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action py-1';
+                item.textContent = t.name;
+                item.onclick = () => { document.getElementById('tagInput').value = t.name; addTag(); };
+                suggestions.appendChild(item);
+            });
+            if (!tags.some(t => t.name.toLowerCase() === q.toLowerCase())) {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action py-1 text-primary';
+                item.innerHTML = `+ Create "<strong>${q}</strong>"`;
+                item.onclick = addTag;
+                suggestions.appendChild(item);
+            }
+            suggestions.style.display = 'block';
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const tagInput = document.getElementById('tagInput');
+    const suggestions = document.getElementById('tagSuggestions');
+    tagInput.addEventListener('input', searchTags);
+    tagInput.addEventListener('keydown', function (e) {
+        const items = suggestions.querySelectorAll('button');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            tagSuggestionIndex = Math.min(tagSuggestionIndex + 1, items.length - 1);
+            items.forEach((el, i) => el.classList.toggle('active', i === tagSuggestionIndex));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            tagSuggestionIndex = Math.max(tagSuggestionIndex - 1, -1);
+            items.forEach((el, i) => el.classList.toggle('active', i === tagSuggestionIndex));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (tagSuggestionIndex >= 0 && items[tagSuggestionIndex]) {
+                items[tagSuggestionIndex].click();
+            } else {
+                addTag();
+            }
+        } else if (e.key === 'Escape') {
+            suggestions.style.display = 'none';
+            tagSuggestionIndex = -1;
+        }
+    });
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('#tagsPanel') && !e.target.closest('[data-bs-target="#tagsPanel"]')) {
+            suggestions.style.display = 'none';
+        }
+    });
+    document.getElementById('addTagBtn').addEventListener('click', addTag);
+});
 </script>
 {% endblock %}

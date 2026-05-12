@@ -267,6 +267,14 @@ class Recipe(db.Model):
                 steps[ri.step_number].append(ri)
         return dict(sorted(steps.items()))
 
+    @property
+    def tag_list(self):
+        if self.group_id:
+            rts = RecipeTag.query.filter_by(group_id=self.group_id).all()
+        else:
+            rts = RecipeTag.query.filter_by(recipe_id=self.id).all()
+        return [rt.tag for rt in rts]
+
 class RecipeIngredient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
@@ -313,6 +321,19 @@ class IngredientTranslation(db.Model):
     name = db.Column(db.String(50), nullable=False)
     __table_args__ = (db.UniqueConstraint('ingredient_id', 'language'),)
     ingredient = db.relationship('Ingredient', backref='translations')
+
+class Tag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('name', 'creator_id'),)
+
+class RecipeTag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=True)
+    group_id = db.Column(db.String(36), nullable=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
+    tag = db.relationship('Tag')
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -410,6 +431,7 @@ def inject_translations():
             'about_custom_units': 'Create your own ingredients with density-aware conversion factors. Define custom measurement units and bind them to specific ingredients.',
             'about_drafts_search_heading': 'Drafts & Search',
             'about_drafts_search': 'Save recipes as drafts while you work on them. Find any recipe instantly with full-text search.',
+            'tags': 'Tags', 'add_tag': 'Add a tag...', 'tag_create': 'Create',
             'onboard_welcome': 'Welcome to Flavor Archive',
             'onboard_subtitle': 'No recipes yet \u2014 here\u2019s what you can do:',
             'onboard_click_convert_heading': 'Click to Convert',
@@ -501,6 +523,7 @@ def inject_translations():
             'about_custom_units': 'Erstellen Sie eigene Zutaten mit dichteabhängigen Umrechnungsfaktoren. Definieren Sie benutzerdefinierte Maßeinheiten und binden Sie sie an bestimmte Zutaten.',
             'about_drafts_search_heading': 'Entwürfe & Suche',
             'about_drafts_search': 'Speichern Sie Rezepte als Entwürfe, während Sie daran arbeiten. Finden Sie jedes Rezept sofort mit der Volltextsuche.',
+            'tags': 'Tags', 'add_tag': 'Tag hinzufügen...', 'tag_create': 'Erstellen',
             'onboard_welcome': 'Willkommen bei Flavor Archive',
             'onboard_subtitle': 'Noch keine Rezepte \u2014 hier erfahren Sie, was Sie tun können:',
             'onboard_click_convert_heading': 'Klicken & Umrechnen',
@@ -592,6 +615,7 @@ def inject_translations():
             'about_custom_units': 'Создавайте собственные ингредиенты с коэффициентами конвертации, учитывающими плотность. Определяйте пользовательские единицы измерения и привязывайте их к конкретным ингредиентам.',
             'about_drafts_search_heading': 'Черновики и поиск',
             'about_drafts_search': 'Сохраняйте рецепты как черновики во время работы. Находите любой рецепт мгновенно с помощью полнотекстового поиска.',
+            'tags': 'Теги', 'add_tag': 'Добавить тег...', 'tag_create': 'Создать',
             'onboard_welcome': 'Добро пожаловать в Flavor Archive',
             'onboard_subtitle': 'Рецептов пока нет — вот что вы можете сделать:',
             'onboard_click_convert_heading': 'Нажми для конвертации',
@@ -921,10 +945,81 @@ def ungroup_recipe(recipe_id):
     if recipe.creator_id != current_user.id and not current_user.is_admin:
         flash('You cannot modify this recipe.', 'danger')
         return redirect(url_for('home'))
+    if recipe.group_id:
+        for gt in RecipeTag.query.filter_by(group_id=recipe.group_id).all():
+            if not RecipeTag.query.filter_by(recipe_id=recipe.id, tag_id=gt.tag_id).first():
+                db.session.add(RecipeTag(recipe_id=recipe.id, tag_id=gt.tag_id))
     recipe.group_id = None
     db.session.commit()
     flash('Recipe removed from group.', 'success')
     return redirect(url_for('edit_recipe', recipe_id=recipe.id))
+
+@app.route("/api/recipe/<int:recipe_id>/tags")
+@login_required
+def get_recipe_tags(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
+        return jsonify([])
+    return jsonify([{'id': t.id, 'name': t.name} for t in recipe.tag_list])
+
+@app.route("/api/tags/search")
+@login_required
+def search_tags():
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify([])
+    tags = Tag.query.filter(
+        Tag.creator_id == current_user.id,
+        Tag.name.ilike(f'%{q}%')
+    ).limit(10).all()
+    return jsonify([{'id': t.id, 'name': t.name} for t in tags])
+
+@app.route("/api/tags/add", methods=['POST'])
+@login_required
+def add_tag():
+    recipe_id = request.form.get('recipe_id', type=int)
+    tag_name = request.form.get('tag_name', '').strip()
+    if not recipe_id or not tag_name:
+        return jsonify({'error': 'Missing parameters'}), 400
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    tag = Tag.query.filter_by(name=tag_name, creator_id=current_user.id).first()
+    if not tag:
+        tag = Tag(name=tag_name, creator_id=current_user.id)
+        db.session.add(tag)
+        db.session.flush()
+    if recipe.group_id:
+        existing = RecipeTag.query.filter_by(group_id=recipe.group_id, tag_id=tag.id).first()
+    else:
+        existing = RecipeTag.query.filter_by(recipe_id=recipe.id, tag_id=tag.id).first()
+    if existing:
+        return jsonify({'id': tag.id, 'name': tag.name})
+    rt = RecipeTag(tag_id=tag.id)
+    if recipe.group_id:
+        rt.group_id = recipe.group_id
+    else:
+        rt.recipe_id = recipe.id
+    db.session.add(rt)
+    db.session.commit()
+    return jsonify({'id': tag.id, 'name': tag.name})
+
+@app.route("/api/tags/remove", methods=['POST'])
+@login_required
+def remove_tag():
+    recipe_id = request.form.get('recipe_id', type=int)
+    tag_id = request.form.get('tag_id', type=int)
+    if not recipe_id or not tag_id:
+        return jsonify({'error': 'Missing parameters'}), 400
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    if recipe.group_id:
+        RecipeTag.query.filter_by(group_id=recipe.group_id, tag_id=tag_id).delete()
+    else:
+        RecipeTag.query.filter_by(recipe_id=recipe.id, tag_id=tag_id).delete()
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route("/recipe/<int:recipe_id>/delete", methods=['POST'])
 @login_required
@@ -935,6 +1030,7 @@ def delete_recipe(recipe_id):
         return redirect(url_for('home'))
     RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
     RecipeStep.query.filter_by(recipe_id=recipe.id).delete()
+    RecipeTag.query.filter_by(recipe_id=recipe.id).delete()
     db.session.delete(recipe)
     db.session.commit()
     flash('Recipe deleted.', 'success')
