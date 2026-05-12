@@ -190,6 +190,11 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100 recipe-card shadow-sm">
             <div class="card-body">
+                {% if recipe.image_url %}
+                <div class="mb-2" style="height:140px;overflow:hidden;border-radius:8px;">
+                    <img src="{{ recipe.image_url }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ recipe.title }}">
+                </div>
+                {% endif %}
                 <h5 class="card-title">{{ recipe.title }}</h5>
                 <p class="card-text">{{ (recipe.description or t('no_description'))[:120] }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
                 {% if recipe._tags %}
@@ -254,6 +259,11 @@
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="card h-100 recipe-card shadow-sm secondary-card">
                 <div class="card-body">
+                    {% if recipe.image_url %}
+                    <div class="mb-2" style="height:140px;overflow:hidden;border-radius:8px;">
+                        <img src="{{ recipe.image_url }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ recipe.title }}">
+                    </div>
+                    {% endif %}
                     <h5 class="card-title">{{ recipe.title }}</h5>
                     <p class="card-text">{{ (recipe.description or t('no_description'))[:120] }}{% if recipe.description and recipe.description|length > 120 %}...{% endif %}</p>
                     {% if recipe._tags %}

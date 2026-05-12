@@ -48,15 +48,15 @@ login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 bcrypt = Bcrypt(app)
 
-def get_user_grouped_recipes(user_id, exclude_recipe_id=None):
+def get_user_grouped_recipes(user_id, exclude_recipe_id=None, admin=False):
     from sqlalchemy import func
+    base_filter = [Recipe.group_id != None]
+    if not admin:
+        base_filter.append(Recipe.creator_id == user_id)
     subquery = db.session.query(
         Recipe.group_id,
         func.max(Recipe.id).label('max_id')
-    ).filter(
-        Recipe.creator_id == user_id,
-        Recipe.group_id != None
-    )
+    ).filter(*base_filter)
     if exclude_recipe_id:
         subquery = subquery.filter(Recipe.id != exclude_recipe_id)
     subquery = subquery.group_by(Recipe.group_id).subquery()
@@ -65,20 +65,20 @@ def get_user_grouped_recipes(user_id, exclude_recipe_id=None):
     
     grouped_languages = {}
     for r in recipes:
-        variants = Recipe.query.filter(
-            Recipe.group_id == r.group_id,
-            Recipe.creator_id == user_id
-        ).all()
+        variants_filter = [Recipe.group_id == r.group_id]
+        if not admin:
+            variants_filter.append(Recipe.creator_id == user_id)
+        variants = Recipe.query.filter(*variants_filter).all()
         if exclude_recipe_id:
             variants = [v for v in variants if v.id != exclude_recipe_id]
         grouped_languages[r.group_id] = [v.language for v in variants]
     return recipes, grouped_languages
 
-def get_group_variants(group_id, creator_id, exclude_recipe_id=None):
-    query = Recipe.query.filter(
-        Recipe.group_id == group_id,
-        Recipe.creator_id == creator_id
-    )
+def get_group_variants(group_id, creator_id, exclude_recipe_id=None, admin=False):
+    filters = [Recipe.group_id == group_id]
+    if not admin:
+        filters.append(Recipe.creator_id == creator_id)
+    query = Recipe.query.filter(*filters)
     if exclude_recipe_id:
         query = query.filter(Recipe.id != exclude_recipe_id)
     return query.all()
@@ -123,7 +123,7 @@ class Unit(db.Model):
     name_ru = db.Column(db.String(30), nullable=True)
     unit_type = db.Column(db.String(10), nullable=False)
     grams_conversion = db.Column(db.Float, nullable=False)
-    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_bound = db.Column(db.Boolean, default=False)
     ingredient_units = db.relationship('UnitIngredient', backref='unit', cascade="all, delete-orphan", lazy=True)
 
@@ -145,7 +145,7 @@ class Ingredient(db.Model):
     preferred_unit_id = db.Column(db.Integer, db.ForeignKey('unit.id'), nullable=True)
     preferred_unit = db.relationship('Unit', foreign_keys=[preferred_unit_id])
     comment = db.Column(db.String(100), nullable=True)
-    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     unit_associations = db.relationship('UnitIngredient', backref='ingredient', cascade="all, delete-orphan", lazy=True)
 
     def get_name(self, target_lang=None):
@@ -209,9 +209,24 @@ class Recipe(db.Model):
     cooking_time = db.Column(db.Integer, nullable=True)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     group_id = db.Column(db.String(36), nullable=True, index=True)
+    image = db.Column(db.String(200), nullable=True)
     recipe_ingredients = db.relationship('RecipeIngredient', backref='recipe', cascade="all, delete-orphan", lazy=True)
     steps = db.relationship('RecipeStep', backref='recipe', cascade="all, delete-orphan", lazy=True, order_by='RecipeStep.step_number')
     __table_args__ = (db.Index('idx_group_creator', 'group_id', 'creator_id'),)
+
+    @property
+    def image_url(self):
+        if self.image:
+            return url_for('static', filename='uploads/' + self.image)
+        if self.group_id:
+            sibling = Recipe.query.filter(
+                Recipe.group_id == self.group_id,
+                Recipe.image != None,
+                Recipe.id != self.id
+            ).first()
+            if sibling:
+                return url_for('static', filename='uploads/' + sibling.image)
+        return None
 
     @property
     def total_weight_grams(self):
@@ -459,7 +474,7 @@ def inject_translations():
             'about_drafts_search': 'Save recipes as drafts while you work on them. Find any recipe instantly with full-text search.',
             'tags': 'Tags', 'add_tag': 'Add a tag...', 'tag_create': 'Create',
             'tag_name': 'Tag', 'delete_tag': 'Delete Tag',
-            'onboard_welcome': 'Welcome to Flavor Archive',
+            'onboard_welcome': 'Welcome to Simmer',
             'onboard_subtitle': 'No recipes yet \u2014 here\u2019s what you can do:',
             'onboard_click_convert_heading': 'Click to Convert',
             'onboard_click_convert': 'Click any ingredient amount on a recipe to instantly switch between grams, cups, mL, and more. No math, no googling.',
@@ -560,7 +575,7 @@ def inject_translations():
             'about_drafts_search': 'Speichern Sie Rezepte als Entwürfe, während Sie daran arbeiten. Finden Sie jedes Rezept sofort mit der Volltextsuche.',
             'tags': 'Tags', 'add_tag': 'Tag hinzufügen...', 'tag_create': 'Erstellen',
             'tag_name': 'Tag', 'delete_tag': 'Tag löschen',
-            'onboard_welcome': 'Willkommen bei Flavor Archive',
+            'onboard_welcome': 'Willkommen bei Simmer',
             'onboard_subtitle': 'Noch keine Rezepte \u2014 hier erfahren Sie, was Sie tun können:',
             'onboard_click_convert_heading': 'Klicken & Umrechnen',
             'onboard_click_convert': 'Klicken Sie auf eine Zutatenmenge in einem Rezept, um sofort zwischen Gramm, Tassen, ml und mehr zu wechseln. Kein Rechnen, kein Googeln.',
@@ -661,7 +676,7 @@ def inject_translations():
             'about_drafts_search': 'Сохраняйте рецепты как черновики во время работы. Находите любой рецепт мгновенно с помощью полнотекстового поиска.',
             'tags': 'Теги', 'add_tag': 'Добавить тег...', 'tag_create': 'Создать',
             'tag_name': 'Тег', 'delete_tag': 'Удалить тег',
-            'onboard_welcome': 'Добро пожаловать в Flavor Archive',
+            'onboard_welcome': 'Добро пожаловать в Simmer',
             'onboard_subtitle': 'Рецептов пока нет — вот что вы можете сделать:',
             'onboard_click_convert_heading': 'Нажми для конвертации',
             'onboard_click_convert': 'Нажмите на количество ингредиента в рецепте, чтобы мгновенно переключиться между граммами, чашками, мл и другими единицами. Никакой математики, никакого гугления.',
@@ -872,6 +887,27 @@ def home():
 
     return render_template('home.html', recipes=primary_recipes + primary_grouped, secondary_recipes=secondary_recipes, search_query=search_query, tag_filters=tag_filters, all_tags=all_tags)
 
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def save_recipe_image(file):
+    if file and file.filename:
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext in ALLOWED_IMAGE_EXTENSIONS:
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            file.save(os.path.join('static/uploads', filename))
+            return filename
+    return None
+
+def propagate_image_to_group(recipe, filename):
+    if recipe.group_id:
+        siblings = Recipe.query.filter(
+            Recipe.group_id == recipe.group_id,
+            Recipe.id != recipe.id
+        ).all()
+        for sib in siblings:
+            sib.image = filename
+            db.session.add(sib)
+
 @app.route("/recipe/<int:recipe_id>")
 def recipe_detail(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
@@ -952,6 +988,12 @@ def add_recipe():
                 )
                 db.session.add(step)
 
+        image_file = request.files.get('image')
+        if image_file and image_file.filename:
+            filename = save_recipe_image(image_file)
+            if filename:
+                new_recipe.image = filename
+
         try:
             db.session.commit()
             flash('Recipe created!', 'success')
@@ -991,8 +1033,8 @@ def edit_recipe(recipe_id):
             flash('Title is required', 'danger')
             all_ingredients = get_all_ingredients()
             all_units = [{'id': u.id, 'name': u.name, 'name_ru': u.name_ru or u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
-            grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id)
-            grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id) if recipe.group_id else []
+            grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id, admin=current_user.is_admin)
+            grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id, admin=current_user.is_admin) if recipe.group_id else []
             return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
 
         recipe.title = title
@@ -1021,8 +1063,8 @@ def edit_recipe(recipe_id):
                 flash('Portions must be a positive number', 'danger')
                 all_ingredients = get_all_ingredients()
                 all_units = [{'id': u.id, 'name': u.name, 'name_ru': u.name_ru or u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
-                grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id)
-                grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id) if recipe.group_id else []
+                grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id, admin=current_user.is_admin)
+                grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id, admin=current_user.is_admin) if recipe.group_id else []
                 return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
         recipe.portions = portions
 
@@ -1057,6 +1099,19 @@ def edit_recipe(recipe_id):
                 )
                 db.session.add(step)
 
+        image_file = request.files.get('image')
+        if image_file and image_file.filename:
+            filename = save_recipe_image(image_file)
+            if filename:
+                recipe.image = filename
+                if recipe.group_id:
+                    propagate_image_to_group(recipe, filename)
+        remove_image = request.form.get('remove_image')
+        if remove_image == '1':
+            recipe.image = None
+            if recipe.group_id:
+                propagate_image_to_group(recipe, None)
+
         try:
             db.session.commit()
             flash('Recipe updated!', 'success')
@@ -1066,17 +1121,32 @@ def edit_recipe(recipe_id):
             flash(f'Error updating recipe: {str(e)}', 'danger')
             all_ingredients = get_all_ingredients()
             all_units = [{'id': u.id, 'name': u.name, 'name_ru': u.name_ru or u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
-            grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id)
-            grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id) if recipe.group_id else []
+            grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id, admin=current_user.is_admin)
+            grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id, admin=current_user.is_admin) if recipe.group_id else []
             return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
 
     all_ingredients = get_all_ingredients()
     all_units = [{'id': u.id, 'name': u.name, 'name_ru': u.name_ru or u.name, 'unit_type': u.unit_type, 'is_bound': u.is_bound, 'ingredients': [ui.ingredient_id for ui in u.ingredient_units]} for u in Unit.query.all()]
     
-    grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id)
-    grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id) if recipe.group_id else []
+    grouped_recipes, grouped_languages = get_user_grouped_recipes(current_user.id, recipe.id, admin=current_user.is_admin)
+    grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id, admin=current_user.is_admin) if recipe.group_id else []
     
     return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
+
+@app.route("/admin/delete-group", methods=['POST'])
+@admin_required
+def admin_delete_group():
+    group_id = request.form.get('group_id')
+    if not group_id:
+        flash('No group specified.', 'danger')
+        return redirect(url_for('admin_panel'))
+    members = Recipe.query.filter_by(group_id=group_id).all()
+    for recipe in members:
+        recipe.group_id = None
+    RecipeTag.query.filter_by(group_id=group_id).delete()
+    db.session.commit()
+    flash(f'Group deleted ({len(members)} recipes ungrouped).', 'success')
+    return redirect(url_for('admin_panel'))
 
 @app.route("/recipe/<int:recipe_id>/ungroup")
 @login_required
@@ -1234,7 +1304,8 @@ def register():
             flash('Username taken', 'danger')
         else:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-            new_user = User(username=username, password=hashed_password)
+            is_first = User.query.count() == 0
+            new_user = User(username=username, password=hashed_password, is_admin=is_first)
             db.session.add(new_user)
             db.session.commit()
             flash('Registration successful', 'success')
@@ -1313,10 +1384,10 @@ def admin_panel():
         action = request.form.get('action')
 
         if action == 'add_demo_recipe':
-            if create_demo_recipe():
+            if create_demo_recipe(user=current_user):
                 flash('Demo recipe created successfully!', 'success')
             else:
-                flash('Demo recipe could not be created. Ensure demo user and ingredients exist.', 'danger')
+                flash('Demo recipe could not be created. Ensure ingredients exist.', 'danger')
             return redirect(url_for('admin_panel'))
 
         user_id = request.form.get('user_id')
@@ -1351,7 +1422,18 @@ def admin_panel():
 
         return redirect(url_for('admin_panel'))
 
-    return render_template('admin.html', users=users, demo_recipe_exists=demo_recipe_exists)
+    from sqlalchemy import func
+    group_data = db.session.query(
+        Recipe.group_id,
+        func.min(Recipe.id).label('sample_id')
+    ).filter(Recipe.group_id != None).group_by(Recipe.group_id).all()
+    groups = []
+    for g in group_data:
+        sample = Recipe.query.get(g.sample_id)
+        count = Recipe.query.filter_by(group_id=g.group_id).count()
+        groups.append({'group_id': g.group_id, 'title': sample.title if sample else 'Unknown', 'count': count})
+
+    return render_template('admin.html', users=users, demo_recipe_exists=demo_recipe_exists, groups=groups)
 
 @app.route("/ingredient/new", methods=['GET', 'POST'])
 @login_required
@@ -1530,7 +1612,7 @@ def manage_data():
         if action == 'edit_ingredient':
             ing_id = request.form.get('ingredient_id')
             ingredient = Ingredient.query.get(ing_id)
-            if ingredient and (ingredient.creator_id == current_user.id or current_user.is_admin):
+            if ingredient:
                 ingredient.name = request.form.get('name', '').strip()
                 density_val = request.form.get('density')
                 if density_val:
@@ -1553,7 +1635,7 @@ def manage_data():
         elif action == 'edit_unit':
             unit_id = request.form.get('unit_id')
             unit = Unit.query.get(unit_id)
-            if unit and (unit.creator_id == current_user.id or current_user.is_admin):
+            if unit:
                 unit.name = request.form.get('name', '').strip()
                 unit.name_ru = request.form.get('name_ru', '').strip() or None
                 unit.unit_type = request.form.get('unit_type')
@@ -1603,7 +1685,7 @@ def manage_data():
         elif action == 'delete_ingredient':
             ing_id = request.form.get('ingredient_id')
             ingredient = Ingredient.query.get(ing_id)
-            if ingredient and (ingredient.creator_id == current_user.id or current_user.is_admin):
+            if ingredient:
                 in_use_count = RecipeIngredient.query.filter_by(ingredient_id=ingredient.id).count()
                 if in_use_count > 0:
                     flash(f'Cannot delete ingredient "{ingredient.get_name("en")}" — it is used in {in_use_count} recipe(s).', 'danger')
@@ -1617,7 +1699,7 @@ def manage_data():
         elif action == 'delete_unit':
             unit_id = request.form.get('unit_id')
             unit = Unit.query.get(unit_id)
-            if unit and (unit.creator_id == current_user.id or current_user.is_admin):
+            if unit:
                 in_use_count = RecipeIngredient.query.filter_by(unit_id=unit.id).count()
                 if in_use_count > 0:
                     flash(f'Cannot delete unit "{unit.get_name("en")}" — it is used in {in_use_count} recipe(s).', 'danger')
@@ -1652,17 +1734,11 @@ def manage_data():
 
         return redirect(url_for('manage_data'))
 
+    ingredients = Ingredient.query.all()
+    units = Unit.query.all()
     if current_user.is_admin:
-        ingredients = Ingredient.query.all()
-        units = Unit.query.all()
         tags = Tag.query.all()
     else:
-        ingredients = Ingredient.query.filter(
-            (Ingredient.creator_id == current_user.id) | (Ingredient.creator_id == None)
-        ).all()
-        units = Unit.query.filter(
-            (Unit.creator_id == current_user.id) | (Unit.creator_id == None)
-        ).all()
         tags = Tag.query.filter(Tag.creator_id == current_user.id).all()
 
     return render_template('manage_data.html', ingredients=ingredients, units=units, tags=tags)
@@ -1860,9 +1936,8 @@ def print_recipe(recipe_id):
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
 
-def create_demo_recipe():
-    user = User.query.filter_by(username='demo').first()
-    if not user:
+def create_demo_recipe(user=None):
+    if user is None:
         return False
 
     if Recipe.query.filter_by(title='Chocolate Cake').first():
@@ -1969,87 +2044,86 @@ def init_db():
             db.session.execute(text("ALTER TABLE recipe ADD COLUMN work_time INTEGER"))
         if 'cooking_time' not in columns:
             db.session.execute(text("ALTER TABLE recipe ADD COLUMN cooking_time INTEGER"))
+        if 'image' not in columns:
+            db.session.execute(text("ALTER TABLE recipe ADD COLUMN image VARCHAR(200)"))
         db.session.commit()
+
+        demo_user = User.query.filter_by(username='demo').first()
+        if demo_user:
+            demo_user.password = bcrypt.generate_password_hash(os.urandom(32).hex()).decode('utf-8')
+            demo_user.is_admin = False
+            db.session.commit()
         
         db.create_all()
 
         db.create_all()
 
-        user = User.query.first()
-        if not user:
-            user = User(username='demo', password=bcrypt.generate_password_hash('demo').decode('utf-8'), is_admin=True)
-            db.session.add(user)
-            db.session.commit()
-
         g_unit = Unit.query.filter_by(name='g').first()
         if not g_unit:
-            g_unit = Unit(name='g', name_ru='г', unit_type='mass', grams_conversion=1.0, creator_id=user.id)
+            g_unit = Unit(name='g', name_ru='г', unit_type='mass', grams_conversion=1.0, creator_id=None)
             db.session.add(g_unit)
 
         ml_unit = Unit.query.filter_by(name='mL').first()
         if not ml_unit:
-            ml_unit = Unit(name='mL', name_ru='мл', unit_type='volume', grams_conversion=1.0, creator_id=user.id)
+            ml_unit = Unit(name='mL', name_ru='мл', unit_type='volume', grams_conversion=1.0, creator_id=None)
             db.session.add(ml_unit)
 
         tbsp_unit = Unit.query.filter_by(name='EL').first()
         if not tbsp_unit:
-            tbsp_unit = Unit(name='EL', name_ru='ст.л.', unit_type='volume', grams_conversion=15.0, creator_id=user.id)
+            tbsp_unit = Unit(name='EL', name_ru='ст.л.', unit_type='volume', grams_conversion=15.0, creator_id=None)
             db.session.add(tbsp_unit)
 
         tsp_unit = Unit.query.filter_by(name='TL').first()
         if not tsp_unit:
-            tsp_unit = Unit(name='TL', name_ru='ч.л.', unit_type='volume', grams_conversion=5.0, creator_id=user.id)
+            tsp_unit = Unit(name='TL', name_ru='ч.л.', unit_type='volume', grams_conversion=5.0, creator_id=None)
             db.session.add(tsp_unit)
 
         db.session.commit()
 
         if not Ingredient.query.filter_by(name='Flour (Type 405)').first():
-            flour = Ingredient(name='Flour (Type 405)', language='en', density=0.55, density_unit='g/ml', creator_id=user.id)
+            flour = Ingredient(name='Flour (Type 405)', language='en', density=0.55, density_unit='g/ml', creator_id=None)
             db.session.add(flour)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=flour.id, language='de', name='Mehl (Type 405)'))
             db.session.add(IngredientTranslation(ingredient_id=flour.id, language='ru', name='Мука (тип 405)'))
 
-            cocoa = Ingredient(name='Cocoa Powder', language='en', density=0.4, density_unit='g/ml', creator_id=user.id)
+            cocoa = Ingredient(name='Cocoa Powder', language='en', density=0.4, density_unit='g/ml', creator_id=None)
             db.session.add(cocoa)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=cocoa.id, language='de', name='Kakaopulver'))
             db.session.add(IngredientTranslation(ingredient_id=cocoa.id, language='ru', name='Какао-порошок'))
 
-            sugar = Ingredient(name='Sugar', language='en', density=0.85, density_unit='g/ml', creator_id=user.id)
+            sugar = Ingredient(name='Sugar', language='en', density=0.85, density_unit='g/ml', creator_id=None)
             db.session.add(sugar)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=sugar.id, language='de', name='Zucker'))
             db.session.add(IngredientTranslation(ingredient_id=sugar.id, language='ru', name='Сахар'))
 
-            oil = Ingredient(name='Vegetable Oil', language='en', density=0.92, density_unit='g/ml', creator_id=user.id)
+            oil = Ingredient(name='Vegetable Oil', language='en', density=0.92, density_unit='g/ml', creator_id=None)
             db.session.add(oil)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=oil.id, language='de', name='Pflanzenöl'))
             db.session.add(IngredientTranslation(ingredient_id=oil.id, language='ru', name='Растительное масло'))
 
-            baking_powder = Ingredient(name='Baking Powder', language='en', density=0.9, density_unit='g/ml', creator_id=user.id)
+            baking_powder = Ingredient(name='Baking Powder', language='en', density=0.9, density_unit='g/ml', creator_id=None)
             db.session.add(baking_powder)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=baking_powder.id, language='de', name='Backpulver'))
             db.session.add(IngredientTranslation(ingredient_id=baking_powder.id, language='ru', name='Разрыхлитель'))
 
-            water = Ingredient(name='Water', language='en', density=1.0, density_unit='g/ml', creator_id=user.id)
+            water = Ingredient(name='Water', language='en', density=1.0, density_unit='g/ml', creator_id=None)
             db.session.add(water)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=water.id, language='de', name='Wasser'))
             db.session.add(IngredientTranslation(ingredient_id=water.id, language='ru', name='Вода'))
 
-            vanilla = Ingredient(name='Vanilla Extract', language='en', density=1.06, density_unit='g/ml', creator_id=user.id)
+            vanilla = Ingredient(name='Vanilla Extract', language='en', density=1.06, density_unit='g/ml', creator_id=None)
             db.session.add(vanilla)
             db.session.flush()
             db.session.add(IngredientTranslation(ingredient_id=vanilla.id, language='de', name='Vanilleextrakt'))
             db.session.add(IngredientTranslation(ingredient_id=vanilla.id, language='ru', name='Ванильный экстракт'))
 
             db.session.commit()
-
-        if not Recipe.query.first():
-            create_demo_recipe()
 
 init_db()
 

@@ -19,6 +19,11 @@
     <div class="col-md-8">
         <div class="card shadow mb-4">
             <div class="card-body">
+                {% if recipe.image_url %}
+                <div class="mb-3 text-center">
+                    <img src="{{ recipe.image_url }}" class="img-fluid rounded" style="max-height:400px;object-fit:cover;" alt="{{ recipe.title }}">
+                </div>
+                {% endif %}
                 <h1>{{ recipe.title }}</h1>
                 <p class="lead text-muted">{{ recipe.description or '' }}</p>
                 {% if recipe.tag_list %}

@@ -1,4 +1,4 @@
-# Flavor Archive
+# Simmer
 
 An open-source, multilingual recipe manager. Organize, discover, and share your favorite dishes without the clutter.
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t('edit_recipe') }} - Flavor Archive{% endblock %}
+{% block title %}{{ t('edit_recipe') }} - Simmer{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,7 +8,7 @@
         <div class="card shadow">
             <div class="card-body">
                 <h3 class="mb-4">{{ t('edit_recipe') }}</h3>
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label">{{ t('title') }}</label>
@@ -86,6 +86,20 @@
                                 <div id="tagSuggestions" class="list-group mt-1" style="max-height:150px;overflow-y:auto;display:none;"></div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Image</label>
+                        {% if recipe.image %}
+                        <div class="mb-2">
+                            <img src="{{ url_for('static', filename='uploads/' + recipe.image) }}" class="img-thumbnail" style="max-height:150px;">
+                            <div class="form-check mt-1">
+                                <input type="checkbox" name="remove_image" value="1" class="form-check-input" id="removeImageCheck">
+                                <label class="form-check-label text-danger" for="removeImageCheck">Remove image</label>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <input type="file" name="image" class="form-control" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
                     </div>
 
                     <hr>

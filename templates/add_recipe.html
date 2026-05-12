@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t('add_recipe') }} - Flavor Archive{% endblock %}
+{% block title %}{{ t('add_recipe') }} - Simmer{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,7 +8,7 @@
         <div class="card shadow">
             <div class="card-body">
                 <h3 class="mb-4">{{ t('add_recipe') }}</h3>
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label">{{ t('title') }}</label>
@@ -39,6 +39,11 @@
                             <label class="form-label">{{ t('cooking_time') }} (min)</label>
                             <input type="number" name="cooking_time" class="form-control" placeholder="e.g. 45" min="0">
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Image</label>
+                        <input type="file" name="image" class="form-control" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
                     </div>
 
                     <hr>

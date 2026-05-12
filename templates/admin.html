@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t('admin_panel') }} - Flavor Archive{% endblock %}
+{% block title %}{{ t('admin_panel') }} - Simmer{% endblock %}
 
 {% block content %}
 <h2>{{ t('admin_panel') }}</h2>
@@ -76,4 +76,37 @@
         </tbody>
     </table>
 </div>
+
+{% if groups %}
+<hr class="my-5">
+<h3>Recipe Groups</h3>
+<div class="table-responsive mt-3">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Group ID</th>
+                <th>Sample Recipe</th>
+                <th>Recipes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in groups %}
+            <tr>
+                <td><code>{{ g.group_id[:12] }}...</code></td>
+                <td>{{ g.title }}</td>
+                <td>{{ g.count }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin_delete_group') }}" onsubmit="return confirm('Ungroup all {{ g.count }} recipes in this group?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="group_id" value="{{ g.group_id }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete Group</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 {% endblock %}
