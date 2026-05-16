@@ -1,7 +1,7 @@
 import multiprocessing
 import os
 
-bind = os.environ.get("GUNICORN_BIND", "0.0.0.0:5000")
+bind = os.environ.get("GUNICORN_BIND", "127.0.0.1:5000")
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "sync"
 worker_connections = 1000
