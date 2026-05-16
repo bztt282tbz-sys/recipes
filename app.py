@@ -130,6 +130,9 @@ class Unit(db.Model):
     def get_name(self, target_lang=None):
         if target_lang is None:
             target_lang = session.get('lang', 'en')
+        if self.unit_type == 'count':
+            pieces = {'en': 'pcs', 'de': 'Stk', 'ru': 'шт'}
+            return pieces.get(target_lang, 'pcs')
         if target_lang == 'ru' and self.name_ru:
             return self.name_ru
         return self.name
@@ -320,11 +323,9 @@ class RecipeIngredient(db.Model):
 
     @property
     def display_unit(self):
-        target_lang = session.get('lang', 'en')
         if self.unit:
-            if target_lang == 'ru' and self.unit.name_ru:
-                return self.unit.name_ru
-            return self.unit.name
+            return self.unit.get_name()
+        target_lang = session.get('lang', 'en')
         return 'г' if target_lang == 'ru' else 'g'
 
 class RecipeStep(db.Model):
@@ -343,10 +344,9 @@ class IngredientTranslation(db.Model):
 
 class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)
+    name = db.Column(db.String(50), unique=True, nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     translations = db.relationship('TagTranslation', backref='tag', cascade="all, delete-orphan", lazy=True)
-    __table_args__ = (db.UniqueConstraint('name', 'creator_id'),)
 
     def get_name(self, target_lang=None):
         if target_lang is None:
@@ -453,7 +453,7 @@ def inject_translations():
             'tour_olive_oil': 'Olive Oil', 'tour_flour': 'Flour', 'tour_sugar': 'Sugar', 'tour_eggs': 'Eggs',
             'tour_chocolate_cake': 'Chocolate Cake', 'tour_butter': 'Butter', 'tour_milk': 'Milk',
             'tour_step1': 'Mix ingredients', 'tour_step2': 'Add wet ingredients', 'tour_step3': 'Brush top with milk',
-            'g_abbr': 'g', 'ml_abbr': 'ml', 'cups_abbr': 'cups',
+            'g_abbr': 'g', 'ml_abbr': 'ml', 'cups_abbr': 'cups', 'pieces_abbr': 'pcs',
             'tour_convert_result': '91.2 g', 'tour_custom_result': '0.88 cups',
             'about_features': 'Features',
             'about_unit_conversion_heading': 'Unit Conversion',
@@ -554,7 +554,7 @@ def inject_translations():
             'tour_olive_oil': 'Olivenöl', 'tour_flour': 'Mehl', 'tour_sugar': 'Zucker', 'tour_eggs': 'Eier',
             'tour_chocolate_cake': 'Schokoladenkuchen', 'tour_butter': 'Butter', 'tour_milk': 'Milch',
             'tour_step1': 'Zutaten mischen', 'tour_step2': 'Feuchte Zutaten hinzufügen', 'tour_step3': 'Mit Milch bestreichen',
-            'g_abbr': 'g', 'ml_abbr': 'ml', 'cups_abbr': 'Tassen',
+            'g_abbr': 'g', 'ml_abbr': 'ml', 'cups_abbr': 'Tassen', 'pieces_abbr': 'Stk',
             'tour_convert_result': '91.2 g', 'tour_custom_result': '0.88 Tassen',
             'about_features': 'Funktionen',
             'about_unit_conversion_heading': 'Einheitenumrechnung',
@@ -655,7 +655,7 @@ def inject_translations():
             'tour_olive_oil': 'Оливковое масло', 'tour_flour': 'Мука', 'tour_sugar': 'Сахар', 'tour_eggs': 'Яйца',
             'tour_chocolate_cake': 'Шоколадный торт', 'tour_butter': 'Масло', 'tour_milk': 'Молоко',
             'tour_step1': 'Смешайте ингредиенты', 'tour_step2': 'Добавьте влажные ингредиенты', 'tour_step3': 'Смазать верх молоком',
-            'g_abbr': 'г', 'ml_abbr': 'мл', 'cups_abbr': 'чашки',
+            'g_abbr': 'г', 'ml_abbr': 'мл', 'cups_abbr': 'чашки', 'pieces_abbr': 'шт',
             'tour_convert_result': '91.2 г', 'tour_custom_result': '0.88 чашки',
             'about_features': 'Возможности',
             'about_unit_conversion_heading': 'Конвертация единиц',
@@ -709,6 +709,9 @@ def inject_translations():
         if hasattr(unit, 'get_name'):
             return unit.get_name(current_lang)
         if isinstance(unit, dict):
+            if unit.get('unit_type') == 'count':
+                pieces = {'en': 'pcs', 'de': 'Stk', 'ru': 'шт'}
+                return pieces.get(current_lang, 'pcs')
             if current_lang == 'ru' and unit.get('name_ru'):
                 return unit['name_ru']
             return unit.get('name', '')
@@ -1181,7 +1184,6 @@ def search_tags():
         return jsonify([])
     lang = session.get('lang', 'en')
     tags = Tag.query.filter(
-        Tag.creator_id == current_user.id,
         Tag.name.ilike(f'%{q}%')
     ).limit(10).all()
     return jsonify([{'id': t.id, 'name': t.name, 'display_name': t.get_name(lang)} for t in tags])
@@ -1196,7 +1198,7 @@ def add_tag():
     recipe = Recipe.query.get_or_404(recipe_id)
     if recipe.creator_id != current_user.id and not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
-    tag = Tag.query.filter_by(name=tag_name, creator_id=current_user.id).first()
+    tag = Tag.query.filter_by(name=tag_name).first()
     if not tag:
         tag = Tag(name=tag_name, creator_id=current_user.id)
         db.session.add(tag)
@@ -1736,10 +1738,7 @@ def manage_data():
 
     ingredients = Ingredient.query.all()
     units = Unit.query.all()
-    if current_user.is_admin:
-        tags = Tag.query.all()
-    else:
-        tags = Tag.query.filter(Tag.creator_id == current_user.id).all()
+    tags = Tag.query.all()
 
     return render_template('manage_data.html', ingredients=ingredients, units=units, tags=tags)
 
@@ -2057,6 +2056,21 @@ def init_db():
         db.create_all()
 
         db.create_all()
+
+        try:
+            tag_indexes = [i for i in inspect(db.engine).get_indexes('tag')]
+            for idx in tag_indexes:
+                if idx.get('unique') and set(idx.get('column_names', [])) == {'name', 'creator_id'}:
+                    db.session.execute(text(f"DROP INDEX IF EXISTS {idx['name']}"))
+            has_name_unique = any(
+                idx.get('unique') and idx.get('column_names') == ['name']
+                for idx in tag_indexes
+            )
+            if not has_name_unique:
+                db.session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_tag_name ON tag (name)"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         g_unit = Unit.query.filter_by(name='g').first()
         if not g_unit:

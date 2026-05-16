@@ -2,6 +2,9 @@
 
 An open-source, multilingual recipe manager. Organize, discover, and share your favorite dishes without the clutter.
 
+**Live demo:** [https://recipes.meide-it.org](https://recipes.meide-it.org)
+
+
 ## Features
 
 - **Full CRUD** — create, edit, delete, and browse recipes
@@ -44,7 +47,7 @@ The app creates the database and seeds default data on first run. Open `http://l
 
 ### Default admin account
 
-**Username:** `demo` **Password:** `demo`
+(outdated?) **Username:** `demo` **Password:** `demo`
 
 ## Environment Variables
 

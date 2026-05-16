@@ -19,6 +19,7 @@ build/
 start.sh
 .vscode/
 .idea/
+static/uploads/*
 *.iml
 *.sublime-project
 *.sublime-workspace
