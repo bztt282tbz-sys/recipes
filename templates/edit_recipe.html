@@ -156,18 +156,28 @@
                         <label class="form-check-label" for="draftCheck">{{ t('is_draft') }}</label>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <div>
+                        <div class="d-flex align-items-center gap-2">
                             <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-secondary">{{ t('cancel') }}</a>
-                            <button type="submit" class="btn btn-primary ms-2">{{ t('save') }}</button>
+                            {% if current_user.is_admin or recipe.creator_id == current_user.id %}
+                            <a href="#" class="text-danger small text-decoration-none" onclick="if(confirm('{{ t('confirm_delete') }}?')){document.getElementById('delete-form').submit();}return false;">{{ t('delete_recipe') }}</a>
+                            {% endif %}
                         </div>
-                        {% if current_user.is_admin or recipe.creator_id == current_user.id %}
-                        <form method="POST" action="{{ url_for('delete_recipe', recipe_id=recipe.id) }}" onsubmit="return confirm('{{ t('confirm_delete') }}?')">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-danger">{{ t('delete_recipe') }}</button>
-                        </form>
-                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
                     </div>
                 </form>
+                <form id="delete-form" method="POST" action="{{ url_for('delete_recipe', recipe_id=recipe.id) }}" class="d-none">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                </form>
+                <input type="hidden" id="replicate-csrf" value="{{ csrf_token() }}">
+                {% if not recipe.group_id %}
+                <div class="mt-2">
+                    <small class="text-muted">{{ t('replicate_recipe') }}:
+                    {% for l, label in languages if l != recipe.language %}
+                    <a href="#" class="text-muted small text-decoration-none" onclick="replicateRecipe('{{ l }}');return false;">{{ label }}</a>{% if not loop.last %} | {% endif %}
+                    {% endfor %}
+                    </small>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -335,6 +345,19 @@ function searchTags() {
             }
             suggestions.style.display = 'block';
         });
+}
+
+function replicateRecipe(lang) {
+    if (!confirm('{{ t("replicate_recipe") }} ' + lang.toUpperCase() + '?')) return;
+    const formData = new FormData();
+    formData.append('csrf_token', document.getElementById('replicate-csrf').value);
+    formData.append('target_lang', lang);
+    fetch('{{ url_for("replicate_recipe", recipe_id=recipe.id) }}', {
+        method: 'POST',
+        body: new URLSearchParams(formData)
+    }).then(r => {
+        if (r.redirected) window.location.href = r.url;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {

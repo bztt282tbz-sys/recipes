@@ -495,6 +495,7 @@ def inject_translations():
             'about': 'About',
             'impressum': 'Impressum',
             'privacy': 'Datenschutzhinweise',
+            'replicate_recipe': 'Replicate as',
         },
         'de': {
             'home': 'Startseite', 'add_recipe': 'Rezept hinzufügen',
@@ -596,6 +597,7 @@ def inject_translations():
             'about': 'Über',
             'impressum': 'Impressum',
             'privacy': 'Datenschutzhinweise',
+            'replicate_recipe': 'Duplizieren als',
         },
         'ru': {
             'home': 'Главная', 'add_recipe': 'Добавить рецепт',
@@ -697,6 +699,7 @@ def inject_translations():
             'about': 'О проекте',
             'impressum': 'Импрессум',
             'privacy': 'Защита данных',
+            'replicate_recipe': 'Дублировать как',
         }
     }
 
@@ -1135,6 +1138,55 @@ def edit_recipe(recipe_id):
     grouped_variants = get_group_variants(recipe.group_id, current_user.id, recipe.id, admin=current_user.is_admin) if recipe.group_id else []
     
     return render_template('edit_recipe.html', recipe=recipe, all_ingredients=all_ingredients, all_units=all_units, grouped_recipes=grouped_recipes, grouped_languages=grouped_languages, grouped_variants=grouped_variants)
+
+@app.route("/recipe/<int:recipe_id>/replicate", methods=['POST'])
+@login_required
+def replicate_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    if recipe.creator_id != current_user.id and not current_user.is_admin:
+        flash('You cannot replicate this recipe.', 'danger')
+        return redirect(url_for('home'))
+    target_lang = request.form.get('target_lang', '').strip()
+    if target_lang not in ('en', 'de', 'ru'):
+        flash('Invalid target language.', 'danger')
+        return redirect(url_for('edit_recipe', recipe_id=recipe.id))
+    new_recipe = Recipe(
+        title=recipe.title,
+        description=recipe.description,
+        instructions=recipe.instructions,
+        is_draft=True,
+        portions=recipe.portions,
+        work_time=recipe.work_time,
+        cooking_time=recipe.cooking_time,
+        language=target_lang,
+        creator_id=current_user.id
+    )
+    db.session.add(new_recipe)
+    db.session.flush()
+    for ri in recipe.recipe_ingredients:
+        new_ri = RecipeIngredient(
+            recipe_id=new_recipe.id,
+            ingredient_id=ri.ingredient_id,
+            amount=ri.amount,
+            unit_id=ri.unit_id,
+            step_number=ri.step_number
+        )
+        db.session.add(new_ri)
+    for step in recipe.steps:
+        new_step = RecipeStep(
+            recipe_id=new_recipe.id,
+            step_number=step.step_number,
+            instruction=step.instruction
+        )
+        db.session.add(new_step)
+    try:
+        db.session.commit()
+        flash('Recipe duplicated!', 'success')
+        return redirect(url_for('edit_recipe', recipe_id=new_recipe.id))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error replicating recipe: {str(e)}', 'danger')
+        return redirect(url_for('edit_recipe', recipe_id=recipe.id))
 
 @app.route("/admin/delete-group", methods=['POST'])
 @admin_required
