@@ -45,9 +45,9 @@ python app.py
 
 The app creates the database and seeds default data on first run. Open `http://localhost:5000`.
 
-### Default admin account
+### Admin access
 
-(outdated?) **Username:** `demo` **Password:** `demo`
+The first user to register automatically becomes an admin. No default demo account exists.
 
 ## Environment Variables
 
